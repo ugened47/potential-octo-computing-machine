@@ -1,0 +1,3 @@
+# Devcontainer-specific files that should not be committed
+.env
+*.log

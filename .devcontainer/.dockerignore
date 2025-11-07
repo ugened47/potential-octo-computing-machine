@@ -1,0 +1,15 @@
+# Ignore everything by default
+**
+
+# But include necessary files
+!.devcontainer/
+!.devcontainer/**
+
+# Python
+!backend/requirements.txt
+!backend/pyproject.toml
+!backend/setup.py
+
+# Node
+!frontend/package.json
+!frontend/package-lock.json

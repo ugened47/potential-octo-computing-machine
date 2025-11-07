@@ -8,6 +8,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     libgomp1 \
+    pkg-config \
+    gcc \
+    libavcodec-dev \
+    libavformat-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libavdevice-dev \
+    libavfilter-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements

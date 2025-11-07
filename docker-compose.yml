@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database
   db:
@@ -33,6 +31,25 @@ services:
       timeout: 3s
       retries: 5
 
+  # MinIO (S3-compatible storage for local development)
+  minio:
+    image: minio/minio:latest
+    container_name: video-editor-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"  # S3 API endpoint
+      - "9001:9001"  # MinIO Console
+    volumes:
+      - minio_data:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
   # FastAPI Backend
   backend:
     build:
@@ -50,15 +67,18 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=your-secret-key-change-in-production
       - ENVIRONMENT=development
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - S3_BUCKET=${S3_BUCKET:-video-editor-uploads}
+      - MINIO_ENDPOINT_URL=http://minio:9000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
 
   # ARQ Worker (Background Tasks)
@@ -66,7 +86,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: video-editor-worker
     command: arq app.worker.WorkerSettings
     volumes:
       - ./backend:/app
@@ -74,15 +93,18 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/videodb
       - REDIS_URL=redis://redis:6379/0
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-minioadmin}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-minioadmin}
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - S3_BUCKET=${S3_BUCKET:-video-editor-uploads}
+      - MINIO_ENDPOINT_URL=http://minio:9000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     deploy:
       replicas: 2
@@ -109,3 +131,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  minio_data:

@@ -1,0 +1,76 @@
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-editor-devcontainer
+
+    volumes:
+      # Mount workspace
+      - ..:/workspace:cached
+
+      # Persist bash history
+      - devcontainer-bashhistory:/commandhistory
+
+      # Persist Python cache
+      - devcontainer-python-cache:/home/vscode/.cache/pip
+
+      # Persist Node modules (prevents re-downloading)
+      - devcontainer-node-modules:/workspace/frontend/node_modules
+      - devcontainer-next-cache:/workspace/frontend/.next
+
+      # Docker socket for Docker-in-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    # Environment variables
+    environment:
+      # Database
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/videodb
+
+      # Redis
+      - REDIS_URL=redis://redis:6379/0
+
+      # Application
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - ENVIRONMENT=development
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
+
+      # Frontend
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+
+      # Python
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+
+      # AWS (optional - load from .env if needed)
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:-video-editor-uploads}
+
+      # OpenAI (optional - load from .env if needed)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+      # Bash history
+      - PROMPT_COMMAND=history -a
+      - HISTFILE=/commandhistory/.bash_history
+
+    # Network
+    network_mode: service:db
+
+    # Keep container running
+    command: sleep infinity
+
+    # Depends on database and redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  devcontainer-bashhistory:
+  devcontainer-python-cache:
+  devcontainer-node-modules:
+  devcontainer-next-cache:

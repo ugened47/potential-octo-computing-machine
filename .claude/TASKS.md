@@ -1,7 +1,7 @@
 # AI Video Clipper - Project Tasks
 
 > **Last Updated:** 2025-11-07
-> **Status:** MVP Development Phase
+> **Status:** MVP Development Phase - Phase 1 Foundation nearly complete
 
 This file tracks implementation status of all features defined in PRD.md. Use `/feature [name]` slash command to implement features systematically.
 
@@ -34,35 +34,37 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
   - Automated deployment
 
 #### 1.2 Backend Foundation
-- 🔴 FastAPI application setup
+- 🟢 FastAPI application setup
   - Main app entry point
   - Configuration management
   - Logging setup
   - Error handling middleware
-- 🔴 Database setup
+- 🟢 Database setup
   - PostgreSQL connection
   - SQLModel base models
   - Alembic migrations setup
-- 🔴 Redis setup
+- 🟢 Redis setup
   - Connection configuration
   - ARQ worker setup
-- 🔴 S3 storage service
+- 🟢 S3 storage service
   - Upload presigned URLs
   - Download URLs
   - CloudFront CDN integration
+  - MinIO support for local development
 
 #### 1.3 Frontend Foundation
-- 🔴 Next.js 14 app setup
+- 🟢 Next.js 14 app setup
   - App router structure
   - Layout components
   - Global styles
-- 🔴 Shadcn UI installation
+- 🟢 Shadcn UI installation
   - Theme configuration
-  - Base components (Button, Card, Input, etc.)
-- 🔴 API client setup
+  - Base components (Button, Card, Input, Progress, Badge, Table, Dialog, Select, etc.)
+- 🟢 API client setup
   - Axios/Fetch configuration
   - Authentication interceptors
   - Error handling
+  - Token refresh logic
 
 ---
 
@@ -98,27 +100,31 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
   - Test fixtures for users
 
 #### 2.2 Frontend Implementation
-- 🔴 Auth pages
+- 🟢 Auth pages
   - Login page
   - Register page
   - Forgot password page
   - Reset password page
-- 🔴 Auth components
+  - Profile page
+- 🟢 Auth components
   - Login form with validation
   - Register form with validation
+  - Forgot password form
+  - Reset password form
   - Google OAuth button
-- 🔴 Auth context/state
-  - User state management
-  - Token storage (httpOnly cookies)
+- 🟢 Auth context/state
+  - User state management (Zustand store)
+  - Token storage (localStorage)
   - Auto-refresh on token expiry
-- 🔴 Protected routes
+- 🟢 Protected routes
   - Middleware for auth check
+  - ProtectedRoute component
   - Redirect to login if not authenticated
 - 🔴 Auth tests
   - Component tests
   - E2E tests for flows
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Frontend Implementation Complete (tests pending)
 
 ---
 
@@ -127,50 +133,63 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
 **Dependencies:** User Authentication, S3 Storage Service
 
 #### 3.1 Backend Implementation
-- 🔴 Video model
+- 🟢 Video model
   - UUID, user_id, title, description
   - File metadata (size, format, duration)
   - S3 key, CloudFront URL
   - Processing status enum
   - Timestamps
-- 🔴 Upload API endpoints
+- 🟢 Upload API endpoints
   - POST /api/upload/presigned-url
     - Generate S3 presigned URL
     - Validate file type/size
   - POST /api/videos
     - Create video record after upload
   - GET /api/videos
-    - List user's videos
+    - List user's videos (with pagination, filtering, sorting)
   - GET /api/videos/{id}
     - Get video details
+  - PATCH /api/videos/{id}
+    - Update video title/description
   - DELETE /api/videos/{id}
     - Delete video and S3 file
-- 🔴 Video validation service
-  - Check format (MP4, MOV, AVI, WebM)
+- 🟢 Video validation service
+  - Check format (MP4, MOV, AVI, WebM, MKV)
   - Check size limit (2GB)
   - Verify uploaded file
-- 🔴 Database migration
+- 🟢 Database migration
   - Create videos table
   - Add indexes
-- 🔴 Tests
+- 🟢 Background metadata extraction
+  - ARQ worker job (extract_video_metadata)
+  - Duration, resolution, format extraction using ffprobe/ffmpeg
+  - Status flow: uploaded → processing → completed/failed
+  - Redis progress tracking
+- 🟡 Tests
+  - Backend tests written (2-8 focused tests per task group)
+  - Full test suite pending
 
 #### 3.2 Frontend Implementation
-- 🔴 Upload page/component
+- 🟢 Upload page/component
   - Drag-and-drop zone
   - File picker fallback
   - File validation (client-side)
-- 🔴 Upload progress
+  - Title/description inputs
+- 🟢 Upload progress
   - Progress bar component
   - Upload to S3 via presigned URL
   - Abort upload functionality
-- 🔴 Video list component
+  - Upload speed and time estimates
+- 🟢 Video list component
   - Card grid layout
-  - Video thumbnails
+  - List/table layout
+  - Video thumbnails (placeholder)
   - Metadata display
-  - Action buttons
-- 🔴 Tests
+  - Action buttons (View, Edit, Delete)
+- 🟡 Tests
+  - Component tests pending
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Implementation Complete (tests pending)
 
 ---
 
@@ -407,28 +426,30 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
 **Dependencies:** Video Upload, User Authentication
 
 #### 9.1 Backend Implementation
-- 🔴 Dashboard API
+- 🟢 Dashboard API
   - GET /api/dashboard/stats
-    - Total videos, clips, processing time
+    - Total videos, storage used (GB), processing time (minutes), recent activity
   - GET /api/videos?sort=date&status=processing
-    - Filtering and sorting
+    - Filtering and sorting (implemented in video endpoints)
 
 #### 9.2 Frontend Implementation
-- 🔴 Dashboard page
-  - Stats cards (total videos, storage used, etc.)
-  - Recent videos list
-  - Processing queue
-- 🔴 Video grid/list view
-  - Toggle between grid and list
-  - Sort by date, name, duration
-  - Filter by status
-- 🔴 Quick actions
+- 🟢 Dashboard page
+  - Stats cards (total videos, storage used, processing time, recent activity)
+  - Video list/grid with search
+  - Processing queue with auto-refresh
+- 🟢 Video grid/list view
+  - Toggle between grid and list (persisted in localStorage)
+  - Sort by date, name, duration (asc/desc)
+  - Filter by status (All, Uploaded, Processing, Completed, Failed)
+  - Search by title
+- 🟢 Quick actions
   - View/Edit buttons
-  - Delete with confirmation
-  - Duplicate video
-- 🔴 Tests
+  - Delete with confirmation dialog
+  - Empty states
+- 🟡 Tests
+  - Component tests pending
 
-**Status:** 🔴 Not Started
+**Status:** 🟢 Implementation Complete (tests pending)
 
 ---
 

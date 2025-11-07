@@ -1,238 +1,210 @@
-# AI Video Clipper - Development Guide
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-AI-powered web application for automatic video slicing, silence removal, and highlight generation. Built with FastAPI (Python) backend and Next.js (React TypeScript) frontend.
+AI-powered web application for automatic video slicing, silence removal, and highlight generation. Built with FastAPI (Python) backend and Next.js 14 (React TypeScript) frontend.
+
+**Current Status:** MVP Phase - Foundation stage (basic project structure in place)
 
 ## Tech Stack
 
-### Backend
-- **Framework**: FastAPI with Python 3.11+
-- **Database**: PostgreSQL 15 with SQLModel
-- **Queue**: Redis 7 + ARQ (async task queue)
-- **Video Processing**: PyAV, FFmpeg, audio-slicer, PySceneDetect
-- **AI/ML**: OpenAI Whisper API, YOLOv8 (optional)
-- **Storage**: AWS S3 + CloudFront CDN
-- **Auth**: JWT tokens
+**Backend:**
+- FastAPI (Python 3.11+) with async/await
+- PostgreSQL 15 (SQLModel ORM)
+- Redis 7 + ARQ (async task queue)
+- PyAV, FFmpeg for video processing
+- OpenAI Whisper API for transcription
+- AWS S3 for storage
 
-### Frontend
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript
-- **UI Components**: Shadcn/ui (Radix UI + Tailwind CSS)
-- **Video**: Remotion Player, Video.js
-- **Timeline**: React-Konva
-- **Audio**: Wavesurfer.js
-- **Real-time**: Server-Sent Events (SSE)
+**Frontend:**
+- Next.js 14 (App Router)
+- TypeScript (strict mode)
+- Shadcn/ui (Radix UI + Tailwind CSS)
+- React-Konva (timeline), Wavesurfer.js (audio viz), Video.js (player)
 
-### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **CI/CD**: GitHub Actions
-- **Cloud**: AWS (S3, CloudFront, EC2/ECS)
+**Infrastructure:**
+- Docker + Docker Compose
+- GitHub Actions (CI/CD)
 
 ## Project Structure
 
 ```
-video-editor/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── api/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes/          # API endpoints
-│   │   │   │   ├── auth.py
-│   │   │   │   ├── videos.py
-│   │   │   │   ├── clips.py
-│   │   │   │   └── processing.py
-│   │   │   └── deps.py          # Dependencies
-│   │   ├── core/
-│   │   │   ├── config.py        # Settings
-│   │   │   ├── security.py      # Auth utilities
-│   │   │   └── db.py            # Database connection
-│   │   ├── models/              # SQLModel models
-│   │   │   ├── user.py
-│   │   │   ├── video.py
-│   │   │   └── clip.py
-│   │   ├── schemas/             # Pydantic schemas
-│   │   ├── services/            # Business logic
-│   │   │   ├── video_processor.py
-│   │   │   ├── transcription.py
-│   │   │   ├── silence_remover.py
-│   │   │   └── s3_storage.py
-│   │   └── worker.py            # ARQ worker
-│   ├── tests/
-│   ├── alembic/                 # Database migrations
-│   ├── requirements.txt
-│   ├── pyproject.toml
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── app/                 # Next.js 14 app directory
-│   │   │   ├── (auth)/
-│   │   │   │   ├── login/
-│   │   │   │   └── register/
-│   │   │   ├── (dashboard)/
-│   │   │   │   ├── videos/
-│   │   │   │   └── editor/
-│   │   │   └── layout.tsx
-│   │   ├── components/
-│   │   │   ├── ui/              # Shadcn components
-│   │   │   ├── video/
-│   │   │   ├── timeline/
-│   │   │   └── transcript/
-│   │   ├── hooks/
-│   │   ├── services/
-│   │   │   └── api.ts
-│   │   ├── lib/
-│   │   └── types/
-│   ├── public/
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── Dockerfile
-├── docker-compose.yml
-├── .env.example
-├── .gitignore
-├── .pre-commit-config.yaml
-├── PRD.md
-└── README.md
+backend/
+├── app/
+│   ├── main.py              # FastAPI app entry
+│   ├── api/routes/          # API endpoints (to implement)
+│   ├── core/                # config.py, db.py, security.py
+│   ├── models/              # SQLModel database models
+│   ├── schemas/             # Pydantic request/response schemas
+│   ├── services/            # Business logic
+│   └── worker.py            # ARQ background worker
+├── tests/                   # pytest tests
+├── alembic/                 # Database migrations
+├── pyproject.toml           # Python config (ruff, mypy, pytest)
+└── requirements.txt
+
+frontend/
+├── src/
+│   ├── app/                 # Next.js 14 app directory
+│   ├── components/          # React components
+│   │   └── ui/             # Shadcn components (to add)
+│   ├── lib/                 # Utilities
+│   └── types/              # TypeScript types
+├── package.json
+└── tsconfig.json
+
+.claude/
+├── CLAUDE.md               # This file
+├── SETUP-GUIDE.md          # Slash commands, skills, workflows
+├── TASKS.md                # Feature tracking
+├── commands/               # 8 slash commands (use /command)
+└── skills/                 # 6 AI skills (auto-activate)
+
+docker-compose.yml          # Services: db, redis, backend, worker, frontend
+PRD.md                      # Product requirements
 ```
 
-## Development Workflow
+## Essential Commands
 
-### 1. Before Starting Any Task
+### Development Environment
 
-**ALWAYS:**
-1. **Read relevant files FIRST** - Use Read tool to understand existing code
-2. **Search codebase** - Use Grep/Glob to find related implementations
-3. **Create detailed plan** - Use TodoWrite to track multi-step tasks
-4. **Ask for approval** - For complex changes, confirm approach with user
-
-### 2. Code Quality Standards
-
-**Backend (Python):**
-- Use **Ruff** for linting and formatting
-- Use **mypy** for type checking
-- Follow **PEP 8** conventions
-- Write **type hints** for all functions
-- Minimum **80% test coverage**
-
-**Frontend (TypeScript):**
-- Use **ESLint** + **Prettier**
-- Strict TypeScript mode
-- Follow **React best practices** (hooks, composition)
-- Component tests with **Vitest**
-- E2E tests with **Playwright**
-
-### 3. Implementation Steps
-
-For every feature:
-
-1. **Database First** (if needed)
-   - Create migration with Alembic
-   - Add SQLModel models
-   - Test migration up/down
-
-2. **Backend Implementation**
-   - Create service layer (business logic)
-   - Add API endpoints
-   - Write unit tests
-   - Add integration tests
-
-3. **Frontend Implementation**
-   - Create TypeScript types
-   - Build UI components
-   - Connect to API
-   - Add loading/error states
-   - Write component tests
-
-4. **Testing**
-   - Run linters: `ruff check .` (backend), `npm run lint` (frontend)
-   - Run type checkers: `mypy app`, `tsc --noEmit`
-   - Run tests: `pytest`, `npm test`
-   - Manual testing
-
-5. **Documentation**
-   - Update relevant comments
-   - Add docstrings for complex functions
-   - Update API documentation (if endpoints changed)
-
-### 4. Running the Application
-
-**Full stack (Docker):**
 ```bash
+# Start all services (Docker)
 docker-compose up
+
+# Start individual services
+docker-compose up db redis              # Just infrastructure
+docker-compose up backend worker        # Backend + worker
+docker-compose up frontend              # Frontend only
+
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f worker
+
+# Stop all services
+docker-compose down
+
+# Reset database (WARNING: deletes all data)
+docker-compose down -v
 ```
 
-**Backend only:**
+### Backend Development
+
 ```bash
 cd backend
-source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+# OR with dev tools (ruff, mypy, pytest)
+pip install -e ".[dev]"
+
+# Run backend locally (without Docker)
 uvicorn app.main:app --reload --port 8000
-```
 
-**Worker (for background tasks):**
-```bash
-cd backend
+# Run worker locally
 arq app.worker.WorkerSettings
+
+# Database migrations
+alembic upgrade head                          # Apply migrations
+alembic revision --autogenerate -m "Message" # Create migration
+alembic downgrade -1                          # Rollback one migration
+
+# Code quality
+ruff format .                # Format code
+ruff check .                 # Lint
+ruff check . --fix          # Auto-fix issues
+mypy app                     # Type check
+
+# Testing
+pytest                       # Run all tests
+pytest tests/test_auth.py    # Run specific test file
+pytest -v                    # Verbose output
+pytest --cov=app             # With coverage
+pytest --cov=app --cov-report=html  # HTML coverage report
 ```
 
-**Frontend only:**
+### Frontend Development
+
 ```bash
 cd frontend
-npm run dev
+
+# Install dependencies
+npm install
+
+# Run frontend locally (without Docker)
+npm run dev                  # Dev server (http://localhost:3000)
+npm run build                # Production build
+npm start                    # Run production build
+
+# Code quality
+npm run lint                 # ESLint
+npm run format               # Prettier
+
+# Type checking
+npx tsc --noEmit
+
+# Testing
+npm test                     # Vitest unit tests
+npm run test:e2e            # Playwright E2E tests
 ```
 
-**Database migrations:**
+### Database Access
+
 ```bash
-cd backend
-alembic upgrade head  # Apply migrations
-alembic revision --autogenerate -m "Description"  # Create new migration
+# Connect to database (when running in Docker)
+docker-compose exec db psql -U postgres videodb
+
+# Run SQL query
+echo "SELECT * FROM users;" | docker-compose exec -T db psql -U postgres videodb
+
+# Check database status
+docker-compose exec backend alembic current
 ```
 
-**Run tests:**
-```bash
-# Backend
-cd backend
-pytest --cov=app --cov-report=html
+## Architecture Patterns
 
-# Frontend
-cd frontend
-npm test
-npm run test:e2e
-```
+### Backend: FastAPI Async Patterns
 
-## Key Technologies & Patterns
-
-### Backend Patterns
-
-**1. Async/Await Everywhere**
-```python
-async def process_video(video_id: UUID) -> Video:
-    async with get_db() as db:
-        video = await db.get(Video, video_id)
-        # Process...
-        await db.commit()
-        return video
-```
-
-**2. Dependency Injection (FastAPI)**
+**Dependency Injection:**
 ```python
 from fastapi import Depends
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 
 @router.get("/videos")
-async def list_videos(user: User = Depends(get_current_user)):
-    return user.videos
+async def list_videos(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    # Use db and user here
+    pass
 ```
 
-**3. Background Jobs (ARQ)**
+**Database Access (SQLModel + AsyncPG):**
 ```python
-async def transcribe_video(ctx, video_id: str):
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+async def get_video(db: AsyncSession, video_id: UUID) -> Video | None:
+    result = await db.execute(select(Video).where(Video.id == video_id))
+    return result.scalar_one_or_none()
+```
+
+**Background Jobs (ARQ):**
+```python
+# In worker.py
+async def process_video(ctx, video_id: str):
     # Long-running task
     await ctx['redis'].set(f"progress:{video_id}", "50")
+    # Process video...
+    return {"status": "complete"}
+
+# Enqueue job from API
+await redis.enqueue_job('process_video', video_id=str(video.id))
 ```
 
-**4. Real-time Progress (SSE)**
+**Real-time Progress (Server-Sent Events):**
 ```python
 from sse_starlette.sse import EventSourceResponse
 
@@ -241,171 +213,243 @@ async def stream_progress(job_id: str):
     async def event_generator():
         while True:
             progress = await redis.get(f"progress:{job_id}")
-            yield {"event": "progress", "data": progress}
+            if progress:
+                yield {"event": "progress", "data": progress}
+            await asyncio.sleep(0.5)
     return EventSourceResponse(event_generator())
 ```
 
-### Frontend Patterns
+### Frontend: Next.js 14 Patterns
 
-**1. Server Components by Default (Next.js 14)**
+**Server Components (Default):**
 ```typescript
 // app/videos/page.tsx
 export default async function VideosPage() {
-  const videos = await fetchVideos(); // Server-side
+  // Fetch data on server
+  const videos = await fetchVideos();
   return <VideoList videos={videos} />;
 }
 ```
 
-**2. Client Components When Needed**
+**Client Components:**
 ```typescript
 'use client'
 import { useState } from 'react';
 
 export function VideoUploader() {
   const [file, setFile] = useState<File | null>(null);
-  // Interactive UI
+  // Interactive UI with hooks
 }
 ```
 
-**3. Shadcn UI Components**
-```typescript
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-
-<Button variant="outline">Upload</Button>
-```
-
-**4. API Client with Error Handling**
+**API Client with Error Handling:**
 ```typescript
 async function uploadVideo(file: File) {
   try {
-    const { uploadUrl } = await api.post('/upload/presigned-url');
-    await fetch(uploadUrl, { method: 'PUT', body: file });
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) throw new Error('Upload failed');
+    return await response.json();
   } catch (error) {
-    toast.error('Upload failed');
+    console.error('Upload error:', error);
+    throw error;
   }
 }
 ```
 
+## Code Quality Standards
+
+### Backend (Python)
+- **Linting:** Ruff (configured in pyproject.toml)
+- **Type Checking:** mypy strict mode
+- **Formatting:** Ruff formatter (100 char line length)
+- **Testing:** pytest with asyncio support, 80%+ coverage target
+- **Type Hints:** Required on all functions
+
+### Frontend (TypeScript)
+- **Linting:** ESLint with Next.js config
+- **Type Checking:** TypeScript strict mode
+- **Formatting:** Prettier
+- **Testing:** Vitest (unit), Playwright (E2E)
+- **Conventions:** React hooks, Server Components by default
+
+## Development Workflow
+
+### For Every Feature
+
+1. **Check Requirements**
+   - Read PRD.md for feature requirements
+   - Check .claude/TASKS.md for status and dependencies
+
+2. **Plan Implementation**
+   - Use TodoWrite for multi-step tasks
+   - Consider: Database → Backend → Frontend → Tests
+
+3. **Implement**
+   - **Database:** Create migration, update models
+   - **Backend:** Add service layer, API endpoints, tests
+   - **Frontend:** Create types, components, connect API
+
+4. **Quality Checks**
+   ```bash
+   # Backend
+   cd backend && ruff format . && ruff check . && mypy app
+
+   # Frontend
+   cd frontend && npm run format && npm run lint && npx tsc --noEmit
+   ```
+
+5. **Testing**
+   ```bash
+   # Backend
+   cd backend && pytest --cov=app
+
+   # Frontend
+   cd frontend && npm test
+   ```
+
+6. **Update Documentation**
+   - Update .claude/TASKS.md status
+   - Add comments for complex logic
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+**Required:**
+- `DATABASE_URL` - PostgreSQL connection string
+- `REDIS_URL` - Redis connection string
+- `SECRET_KEY` - JWT secret (generate with `openssl rand -hex 32`)
+
+**For Production:**
+- `OPENAI_API_KEY` - OpenAI API key (Whisper)
+- `AWS_ACCESS_KEY_ID` - AWS credentials
+- `AWS_SECRET_ACCESS_KEY` - AWS secret
+- `S3_BUCKET` - S3 bucket name
+- `AWS_REGION` - AWS region (default: us-east-1)
+
+## Slash Commands & Skills
+
+This project includes Claude Code automation:
+
+**Slash Commands:** Use `/command-name` for common workflows
+- `/setup` - Initialize development environment
+- `/api [name]` - Create FastAPI endpoint with tests
+- `/component [name]` - Create React component
+- `/migration [description]` - Create database migration
+- `/test [backend|frontend|all]` - Run tests
+- `/quality` - Run all linters and formatters
+- `/feature [name]` - Implement full-stack feature
+- `/docker [up|down|logs|etc]` - Docker operations
+
+**Skills:** Auto-activate based on task context
+- `video-processing` - FFmpeg, PyAV, video optimization
+- `database-design` - PostgreSQL, SQLModel, migrations
+- `api-design` - REST, FastAPI, authentication
+- `security-review` - OWASP, input validation
+- `frontend-architecture` - Next.js, React optimization
+- `performance-optimization` - Query optimization, caching
+
+See `.claude/SETUP-GUIDE.md` for detailed usage.
+
+## Common Issues
+
+**Backend won't start:**
+```bash
+# Check database is running
+docker-compose ps db
+# Check migrations applied
+docker-compose exec backend alembic current
+# Check environment variables
+cat .env
+```
+
+**Worker not processing jobs:**
+```bash
+# Check Redis is running
+docker-compose ps redis
+# Check worker logs
+docker-compose logs -f worker
+# Check job queue
+docker-compose exec redis redis-cli KEYS "arq:*"
+```
+
+**Frontend build fails:**
+```bash
+# Clear build cache
+rm -rf .next
+# Reinstall dependencies
+rm -rf node_modules && npm install
+# Check TypeScript errors
+npx tsc --noEmit
+```
+
+**Database connection issues:**
+```bash
+# Test connection
+docker-compose exec db psql -U postgres videodb -c "\dt"
+# Reset database (WARNING: deletes data)
+docker-compose down -v && docker-compose up -d db
+# Apply migrations
+docker-compose exec backend alembic upgrade head
+```
+
 ## Security Checklist
 
-- [ ] HTTPS only in production
-- [ ] JWT tokens with 30-minute expiration
-- [ ] Refresh tokens for longer sessions
-- [ ] Rate limiting (5 uploads/hour per user)
+- [ ] Use environment variables for secrets (never commit to git)
+- [ ] Validate all user inputs (use Pydantic schemas)
+- [ ] Use parameterized queries (SQLModel handles this)
+- [ ] JWT tokens with expiration (30 minutes)
+- [ ] Rate limiting on uploads (5 per hour per user)
 - [ ] File type validation (video formats only)
 - [ ] File size limits (2GB max)
+- [ ] HTTPS only in production
 - [ ] CORS whitelist (no wildcard in production)
-- [ ] SQL injection protection (SQLModel parameterized queries)
-- [ ] XSS protection (React auto-escaping)
 - [ ] S3 presigned URLs with expiration
-- [ ] Environment variables for secrets (never commit)
 
 ## Performance Guidelines
 
 **Backend:**
-- Use **connection pooling** for database (SQLAlchemy async pool)
-- **Cache** frequently accessed data in Redis
-- **Offload** heavy processing to ARQ workers
-- **Stream** large files (don't load into memory)
-- **Optimize** database queries (use indexes, avoid N+1)
+- Use async/await for all I/O operations
+- Offload heavy processing to ARQ workers
+- Use database connection pooling (SQLAlchemy handles this)
+- Cache frequently accessed data in Redis
+- Stream large files (don't load into memory)
+- Use indexes on frequently queried columns
 
 **Frontend:**
-- Use Next.js **Image component** for optimization
-- **Lazy load** timeline/editor components
-- **Debounce** search and user inputs
-- **Virtualize** long lists (react-window)
-- **Code split** routes automatically (Next.js)
+- Server Components by default
+- Client Components only when needed (interactivity, hooks)
+- Next.js Image component for images
+- Lazy load heavy components (timeline editor)
+- Debounce search inputs
+- Virtualize long lists
 
 **Video Processing:**
-- Use **PyAV** for performance-critical operations
-- **Parallel processing** where possible
-- **Stream** processing (don't load entire video)
-- **GPU acceleration** for ML models (YOLOv8)
-
-## Common Commands
-
-```bash
-# Install dependencies
-cd backend && pip install -e ".[dev]"
-cd frontend && npm install
-
-# Format code
-cd backend && ruff format .
-cd frontend && npm run format
-
-# Type check
-cd backend && mypy app
-cd frontend && tsc --noEmit
-
-# Run linters
-cd backend && ruff check .
-cd frontend && npm run lint
-
-# Database
-cd backend && alembic upgrade head
-
-# Reset database (dev only)
-docker-compose down -v && docker-compose up -d db
-
-# View logs
-docker-compose logs -f backend
-docker-compose logs -f worker
-
-# Access database
-docker-compose exec db psql -U postgres videodb
-```
-
-## Troubleshooting
-
-**Backend won't start:**
-- Check database is running: `docker-compose ps`
-- Check migrations applied: `alembic current`
-- Check environment variables: `.env` file exists
-
-**Worker not processing:**
-- Check Redis is running: `docker-compose ps redis`
-- Check worker logs: `docker-compose logs worker`
-- Check job queue: `redis-cli KEYS "arq:*"`
-
-**Frontend build fails:**
-- Clear `.next`: `rm -rf .next`
-- Reinstall deps: `rm -rf node_modules && npm install`
-- Check TypeScript errors: `tsc --noEmit`
-
-**Video upload fails:**
-- Check S3 credentials in `.env`
-- Check CORS settings on S3 bucket
-- Check file size limits
+- Use PyAV for performance-critical operations
+- Stream processing (chunk-based, not full file in memory)
+- Parallel processing where possible
+- Monitor memory usage (video files are large)
 
 ## Resources
 
-**Documentation:**
-- FastAPI: https://fastapi.tiangolo.com
-- Next.js 14: https://nextjs.org/docs
-- Shadcn/ui: https://ui.shadcn.com
-- Remotion: https://remotion.dev
-- SQLModel: https://sqlmodel.tiangolo.com
+- **PRD.md** - Product requirements and feature specs
+- **.claude/TASKS.md** - Current feature status
+- **.claude/SETUP-GUIDE.md** - Slash commands and skills
+- **FastAPI Docs:** https://fastapi.tiangolo.com
+- **Next.js 14 Docs:** https://nextjs.org/docs
+- **Shadcn/ui:** https://ui.shadcn.com
+- **SQLModel:** https://sqlmodel.tiangolo.com
 
-**API Documentation:**
-- OpenAI Whisper: https://platform.openai.com/docs/guides/speech-to-text
-- AWS S3: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html
+## Notes for Claude Code
 
-## Contact & Support
-
-For questions during development:
-1. Check this CLAUDE.md file
-2. Check PRD.md for product requirements
-3. Check inline code comments
-4. Ask the user for clarification
-
-## Notes for Claude
-
-- **Always read files before editing** - Never assume file structure
-- **Test after changes** - Run relevant tests
-- **Commit often** - Small, focused commits
-- **Clear messages** - Descriptive commit messages
-- **Ask when uncertain** - Better to clarify than assume
-- **Security first** - Always validate user input
-- **Performance matters** - Consider scalability
-- **User experience** - Add loading states, error handling
+- **Read files first** - Never assume project structure
+- **Use slash commands** - Leverage .claude/commands/ for common tasks
+- **Track progress** - Use TodoWrite for complex, multi-step features
+- **Test after changes** - Run tests before marking tasks complete
+- **Security first** - Always validate inputs, never expose secrets
+- **Ask when uncertain** - Better to clarify than make assumptions
+- **Performance matters** - Video processing is resource-intensive
+- **Focus on UX** - Add loading states, error handling, progress indicators

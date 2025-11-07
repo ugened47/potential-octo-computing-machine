@@ -3,11 +3,25 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from pydantic import ValidationError as PydanticValidationError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.core.cache import close_redis
 from app.core.config import settings
 from app.core.db import close_db, init_db
+from app.core.rate_limit import RateLimitMiddleware
+from app.core.error_handler import (
+    app_exception_handler,
+    general_exception_handler,
+    http_exception_handler,
+    integrity_error_handler,
+    sqlalchemy_error_handler,
+    validation_exception_handler,
+)
+from app.core.exceptions import AppException
 
 
 @asynccontextmanager
@@ -18,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
     # Shutdown
     await close_db()
+    await close_redis()
 
 
 # Create FastAPI app
@@ -28,6 +43,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Compression middleware (should be early in the stack)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -36,6 +54,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate limiting middleware
+app.add_middleware(
+    RateLimitMiddleware,
+    calls=settings.rate_limit_api_per_minute,
+    period=60,
+)
+
+# Register exception handlers (order matters - most specific first)
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(PydanticValidationError, validation_exception_handler)
+app.add_exception_handler(IntegrityError, integrity_error_handler)
+app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)
+app.add_exception_handler(Exception, general_exception_handler)
 
 
 @app.get("/")
@@ -50,9 +83,15 @@ async def health_check() -> dict[str, str]:
     return {"status": "healthy"}
 
 
-# Register routers (to be added)
-# from app.api.routes import auth, videos, clips, processing
-# app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
-# app.include_router(videos.router, prefix="/api/videos", tags=["videos"])
-# app.include_router(clips.router, prefix="/api/clips", tags=["clips"])
-# app.include_router(processing.router, prefix="/api/processing", tags=["processing"])
+# Register routers
+from app.api.routes import auth, clip, dashboard, silence, timeline, transcript, video
+
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(transcript.router, prefix="/api", tags=["transcripts"])
+app.include_router(video.upload_router, prefix="/api/upload", tags=["upload"])
+app.include_router(video.video_router, prefix="/api/videos", tags=["videos"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
+app.include_router(silence.router, prefix="/api", tags=["silence"])
+app.include_router(clip.router, prefix="/api", tags=["clips"])
+app.include_router(clip.clip_router, prefix="/api", tags=["clips"])
+app.include_router(timeline.router, prefix="/api", tags=["timeline"])

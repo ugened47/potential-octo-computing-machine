@@ -34,12 +34,24 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(default=30)
     refresh_token_expire_days: int = Field(default=30)
 
-    # AWS S3
+    # AWS S3 / MinIO
     aws_access_key_id: str = Field(default="")
     aws_secret_access_key: str = Field(default="")
     aws_region: str = Field(default="us-east-1")
     s3_bucket: str = Field(default="video-editor-uploads")
     cloudfront_domain: str = Field(default="")
+    minio_endpoint_url: str = Field(default="http://minio:9000")
+    
+    @property
+    def s3_endpoint_url(self) -> str | None:
+        """Get S3 endpoint URL based on environment.
+        
+        Returns:
+            MinIO endpoint URL for development, None for production (uses AWS S3)
+        """
+        if self.environment == "development":
+            return self.minio_endpoint_url
+        return None
 
     # OpenAI
     openai_api_key: str = Field(default="")
