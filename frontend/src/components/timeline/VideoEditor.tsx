@@ -1,143 +1,153 @@
-'use client'
+"use client";
 
-import { useEffect, useState, useCallback } from 'react'
-import { VideoPlayer } from './VideoPlayer'
-import { WaveformDisplay } from './WaveformDisplay'
-import { TimelineEditor } from './TimelineEditor'
-import { TimelineControls } from './TimelineControls'
-import { TranscriptPanel } from '@/components/transcript/TranscriptPanel'
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { getWaveform, generateWaveform, getWaveformStatus } from '@/lib/timeline-api'
-import { getVideoPlaybackUrl } from '@/lib/video-api'
-import type { WaveformData, Segment } from '@/types/timeline'
-import type { Video } from '@/types/video'
+import { useEffect, useState, useCallback } from "react";
+import { VideoPlayer } from "./VideoPlayer";
+import { WaveformDisplay } from "./WaveformDisplay";
+import { TimelineEditor } from "./TimelineEditor";
+import { TimelineControls } from "./TimelineControls";
+import { TranscriptPanel } from "@/components/transcript/TranscriptPanel";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import {
+  getWaveform,
+  generateWaveform,
+  getWaveformStatus,
+} from "@/lib/timeline-api";
+import { getVideoPlaybackUrl } from "@/lib/video-api";
+import type { WaveformData, Segment } from "@/types/timeline";
+import type { Video } from "@/types/video";
 
 interface VideoEditorProps {
-  video: Video
-  className?: string
+  video: Video;
+  className?: string;
 }
 
-export function VideoEditor({ video, className = '' }: VideoEditorProps) {
-  const [videoUrl, setVideoUrl] = useState<string>('')
-  const [waveformData, setWaveformData] = useState<WaveformData | null>(null)
-  const [isLoadingWaveform, setIsLoadingWaveform] = useState(true)
-  const [isGeneratingWaveform, setIsGeneratingWaveform] = useState(false)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [currentTime, setCurrentTime] = useState(0)
-  const [duration, setDuration] = useState(video.duration || 0)
-  const [playbackRate, setPlaybackRate] = useState(1.0)
-  const [zoomLevel, setZoomLevel] = useState(1)
-  const [segments, setSegments] = useState<Segment[]>([])
+export function VideoEditor({ video, className = "" }: VideoEditorProps) {
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
+  const [isLoadingWaveform, setIsLoadingWaveform] = useState(true);
+  const [isGeneratingWaveform, setIsGeneratingWaveform] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(video.duration || 0);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [segments, setSegments] = useState<Segment[]>([]);
 
   // Load video playback URL
   useEffect(() => {
     const loadVideoUrl = async () => {
       try {
-        const url = await getVideoPlaybackUrl(video.id)
-        setVideoUrl(url)
+        const url = await getVideoPlaybackUrl(video.id);
+        setVideoUrl(url);
       } catch (error) {
-        console.error('Failed to load video URL:', error)
+        console.error("Failed to load video URL:", error);
       }
-    }
+    };
 
     if (video.id) {
-      loadVideoUrl()
+      loadVideoUrl();
     }
-  }, [video.id])
+  }, [video.id]);
 
   // Load waveform data
   useEffect(() => {
     const loadWaveform = async () => {
       try {
-        setIsLoadingWaveform(true)
-        const data = await getWaveform(video.id)
-        setWaveformData(data)
+        setIsLoadingWaveform(true);
+        const data = await getWaveform(video.id);
+        setWaveformData(data);
       } catch (error: any) {
         // Waveform doesn't exist, try to generate it
         if (error.response?.status === 404) {
           try {
-            setIsGeneratingWaveform(true)
-            await generateWaveform(video.id)
+            setIsGeneratingWaveform(true);
+            await generateWaveform(video.id);
             // Poll for waveform status
             const pollWaveform = async () => {
-              const maxAttempts = 30
-              let attempts = 0
+              const maxAttempts = 30;
+              let attempts = 0;
               const interval = setInterval(async () => {
-                attempts++
+                attempts++;
                 try {
-                  const status = await getWaveformStatus(video.id)
-                  if (status.status === 'completed') {
-                    const data = await getWaveform(video.id)
-                    setWaveformData(data)
-                    setIsGeneratingWaveform(false)
-                    clearInterval(interval)
-                  } else if (status.status === 'failed' || attempts >= maxAttempts) {
-                    setIsGeneratingWaveform(false)
-                    clearInterval(interval)
+                  const status = await getWaveformStatus(video.id);
+                  if (status.status === "completed") {
+                    const data = await getWaveform(video.id);
+                    setWaveformData(data);
+                    setIsGeneratingWaveform(false);
+                    clearInterval(interval);
+                  } else if (
+                    status.status === "failed" ||
+                    attempts >= maxAttempts
+                  ) {
+                    setIsGeneratingWaveform(false);
+                    clearInterval(interval);
                   }
                 } catch (err) {
                   // Continue polling
                 }
-              }, 2000)
+              }, 2000);
 
               setTimeout(() => {
-                clearInterval(interval)
-                setIsGeneratingWaveform(false)
-              }, 60000) // Timeout after 60 seconds
-            }
-            pollWaveform()
+                clearInterval(interval);
+                setIsGeneratingWaveform(false);
+              }, 60000); // Timeout after 60 seconds
+            };
+            pollWaveform();
           } catch (genError) {
-            console.error('Failed to generate waveform:', genError)
-            setIsGeneratingWaveform(false)
+            console.error("Failed to generate waveform:", genError);
+            setIsGeneratingWaveform(false);
           }
         } else {
-          console.error('Failed to load waveform:', error)
+          console.error("Failed to load waveform:", error);
         }
       } finally {
-        setIsLoadingWaveform(false)
+        setIsLoadingWaveform(false);
       }
-    }
+    };
 
     if (video.id && video.duration) {
-      loadWaveform()
+      loadWaveform();
     }
-  }, [video.id, video.duration])
+  }, [video.id, video.duration]);
 
   const handlePlayPause = useCallback(() => {
-    setIsPlaying((prev) => !prev)
-  }, [])
+    setIsPlaying((prev) => !prev);
+  }, []);
 
-  const handleSeek = useCallback((time: number) => {
-    setCurrentTime(Math.max(0, Math.min(time, duration)))
-  }, [duration])
+  const handleSeek = useCallback(
+    (time: number) => {
+      setCurrentTime(Math.max(0, Math.min(time, duration)));
+    },
+    [duration],
+  );
 
   const handleSeekBackward = useCallback((seconds: number) => {
-    setCurrentTime((prev) => Math.max(0, prev - seconds))
-  }, [])
+    setCurrentTime((prev) => Math.max(0, prev - seconds));
+  }, []);
 
   const handleSeekForward = useCallback((seconds: number) => {
-    setCurrentTime((prev) => Math.min(duration, prev + seconds))
-  }, [])
+    setCurrentTime((prev) => Math.min(duration, prev + seconds));
+  }, []);
 
   const handleZoomIn = useCallback(() => {
-    setZoomLevel((prev) => Math.min(10, prev * 1.2))
-  }, [])
+    setZoomLevel((prev) => Math.min(10, prev * 1.2));
+  }, []);
 
   const handleZoomOut = useCallback(() => {
-    setZoomLevel((prev) => Math.max(1, prev / 1.2))
-  }, [])
+    setZoomLevel((prev) => Math.max(1, prev / 1.2));
+  }, []);
 
   const handleResetZoom = useCallback(() => {
-    setZoomLevel(1)
-  }, [])
+    setZoomLevel(1);
+  }, []);
 
   const handleSegmentClick = useCallback((segmentId: string) => {
     setSegments((prev) =>
       prev.map((seg) =>
-        seg.id === segmentId ? { ...seg, selected: !seg.selected } : seg
-      )
-    )
-  }, [])
+        seg.id === segmentId ? { ...seg, selected: !seg.selected } : seg,
+      ),
+    );
+  }, []);
 
   const handleSegmentDrag = useCallback(
     (segmentId: string, startTime: number, endTime: number) => {
@@ -145,27 +155,27 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
         prev.map((seg) =>
           seg.id === segmentId
             ? { ...seg, start_time: startTime, end_time: endTime }
-            : seg
-        )
-      )
+            : seg,
+        ),
+      );
     },
-    []
-  )
+    [],
+  );
 
   // Keyboard shortcuts
   useKeyboardShortcuts(
     {
-      ' ': handlePlayPause,
-      'arrowleft': () => handleSeekBackward(1),
-      'shift+arrowleft': () => handleSeekBackward(5),
-      'arrowright': () => handleSeekForward(1),
-      'shift+arrowright': () => handleSeekForward(5),
-      '+': handleZoomIn,
-      '-': handleZoomOut,
-      '0': handleResetZoom,
+      " ": handlePlayPause,
+      arrowleft: () => handleSeekBackward(1),
+      "shift+arrowleft": () => handleSeekBackward(5),
+      arrowright: () => handleSeekForward(1),
+      "shift+arrowright": () => handleSeekForward(5),
+      "+": handleZoomIn,
+      "-": handleZoomOut,
+      "0": handleResetZoom,
     },
-    true
-  )
+    true,
+  );
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
@@ -210,7 +220,9 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
       {/* Waveform */}
       {isLoadingWaveform || isGeneratingWaveform ? (
         <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">
-          {isGeneratingWaveform ? 'Generating waveform...' : 'Loading waveform...'}
+          {isGeneratingWaveform
+            ? "Generating waveform..."
+            : "Loading waveform..."}
         </div>
       ) : waveformData ? (
         <WaveformDisplay
@@ -244,6 +256,5 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
         />
       </div>
     </div>
-  )
+  );
 }
-

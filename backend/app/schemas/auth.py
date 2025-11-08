@@ -1,7 +1,6 @@
 """Authentication schemas for request/response validation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, validator
@@ -13,7 +12,7 @@ class UserRegister(BaseModel):
 
     email: EmailStr
     password: str = Field(min_length=8, max_length=100)
-    full_name: Optional[str] = Field(None, max_length=255)
+    full_name: str | None = Field(None, max_length=255)
 
     @validator("password")
     def password_strength(cls, v: str) -> str:
@@ -78,10 +77,10 @@ class UserResponse(BaseModel):
 
     id: UUID
     email: EmailStr
-    full_name: Optional[str]
+    full_name: str | None
     is_active: bool
     created_at: datetime
-    oauth_provider: Optional[str] = None
+    oauth_provider: str | None = None
 
     class Config:
         """Pydantic config."""

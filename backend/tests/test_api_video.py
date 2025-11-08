@@ -94,8 +94,10 @@ async def test_post_presigned_url_generates_url_and_creates_video(
         assert data["presigned_url"] == "http://test-presigned-url"
 
         # Verify video record was created (using db_session from fixture)
-        from sqlmodel import select
         from uuid import UUID
+
+        from sqlmodel import select
+
         video_id = UUID(data["video_id"])
         result = await db_session.execute(select(Video).where(Video.id == video_id))
         video = result.scalar_one_or_none()
@@ -161,9 +163,7 @@ async def test_get_videos_lists_user_videos_with_pagination(
     assert len(data) == 5
 
     # Test filtering by status
-    response = client.get(
-        "/api/videos?status=completed", headers=auth_headers
-    )
+    response = client.get("/api/videos?status=completed", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert all(v["status"] == VideoStatus.COMPLETED.value for v in data)
@@ -261,6 +261,7 @@ async def test_delete_video_deletes_video_and_s3_file(
 
         # Verify video was deleted from database
         from sqlmodel import select
+
         result = await db_session.execute(select(Video).where(Video.id == video_id))
         assert result.scalar_one_or_none() is None
 
@@ -299,4 +300,3 @@ async def test_authorization_users_can_only_access_own_videos(
     # Try to delete other user's video
     response = client.delete(f"/api/videos/{video.id}", headers=auth_headers)
     assert response.status_code == 403
-

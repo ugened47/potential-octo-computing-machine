@@ -1,106 +1,106 @@
-'use client'
+"use client";
 
-import { useState, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { GoogleOAuthButton } from './GoogleOAuthButton'
-import { register } from '@/lib/auth-api'
-import { useAuth } from '@/store/auth-store'
-import { validateEmail, validatePassword } from '@/lib/validation'
-import { Loader2 } from 'lucide-react'
+import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
+import { register } from "@/lib/auth-api";
+import { useAuth } from "@/store/auth-store";
+import { validateEmail, validatePassword } from "@/lib/validation";
+import { Loader2 } from "lucide-react";
 
 export function RegisterForm() {
-  const router = useRouter()
-  const { setUser } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [emailError, setEmailError] = useState('')
-  const [passwordError, setPasswordError] = useState('')
-  const [fullNameError, setFullNameError] = useState('')
-  const [generalError, setGeneralError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const { setUser } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [fullNameError, setFullNameError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleEmailBlur = () => {
     if (!email) {
-      setEmailError('Email is required')
+      setEmailError("Email is required");
     } else if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
+      setEmailError("Please enter a valid email address");
     } else {
-      setEmailError('')
+      setEmailError("");
     }
-  }
+  };
 
   const handlePasswordBlur = () => {
     if (!password) {
-      setPasswordError('Password is required')
+      setPasswordError("Password is required");
     } else {
-      const validation = validatePassword(password)
+      const validation = validatePassword(password);
       if (!validation.valid) {
-        setPasswordError(validation.errors[0])
+        setPasswordError(validation.errors[0]);
       } else {
-        setPasswordError('')
+        setPasswordError("");
       }
     }
-  }
+  };
 
   const handleFullNameBlur = () => {
     if (!fullName.trim()) {
-      setFullNameError('Full name is required')
+      setFullNameError("Full name is required");
     } else {
-      setFullNameError('')
+      setFullNameError("");
     }
-  }
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setGeneralError('')
+    e.preventDefault();
+    setGeneralError("");
 
     // Validate
-    let isValid = true
+    let isValid = true;
     if (!email) {
-      setEmailError('Email is required')
-      isValid = false
+      setEmailError("Email is required");
+      isValid = false;
     } else if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
-      isValid = false
+      setEmailError("Please enter a valid email address");
+      isValid = false;
     }
 
     if (!password) {
-      setPasswordError('Password is required')
-      isValid = false
+      setPasswordError("Password is required");
+      isValid = false;
     } else {
-      const validation = validatePassword(password)
+      const validation = validatePassword(password);
       if (!validation.valid) {
-        setPasswordError(validation.errors[0])
-        isValid = false
+        setPasswordError(validation.errors[0]);
+        isValid = false;
       }
     }
 
     if (!fullName.trim()) {
-      setFullNameError('Full name is required')
-      isValid = false
+      setFullNameError("Full name is required");
+      isValid = false;
     }
 
-    if (!isValid) return
+    if (!isValid) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await register(email, password, fullName)
-      setUser(response.user)
-      router.push('/onboarding')
+      const response = await register(email, password, fullName);
+      setUser(response.user);
+      router.push("/onboarding");
     } catch (error: any) {
       if (error.response?.data?.detail) {
-        setGeneralError(error.response.data.detail)
+        setGeneralError(error.response.data.detail);
       } else {
-        setGeneralError('Registration failed. Please try again.')
+        setGeneralError("Registration failed. Please try again.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -122,7 +122,7 @@ export function RegisterForm() {
           onBlur={handleFullNameBlur}
           placeholder="John Doe"
           disabled={isLoading}
-          className={fullNameError ? 'border-destructive' : ''}
+          className={fullNameError ? "border-destructive" : ""}
         />
         {fullNameError && (
           <p className="text-sm text-destructive">{fullNameError}</p>
@@ -141,11 +141,9 @@ export function RegisterForm() {
           onBlur={handleEmailBlur}
           placeholder="you@example.com"
           disabled={isLoading}
-          className={emailError ? 'border-destructive' : ''}
+          className={emailError ? "border-destructive" : ""}
         />
-        {emailError && (
-          <p className="text-sm text-destructive">{emailError}</p>
-        )}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
       </div>
 
       <div className="space-y-2">
@@ -160,7 +158,7 @@ export function RegisterForm() {
           onBlur={handlePasswordBlur}
           placeholder="Enter your password"
           disabled={isLoading}
-          className={passwordError ? 'border-destructive' : ''}
+          className={passwordError ? "border-destructive" : ""}
         />
         {passwordError && (
           <p className="text-sm text-destructive">{passwordError}</p>
@@ -177,7 +175,7 @@ export function RegisterForm() {
             Creating account...
           </>
         ) : (
-          'Create account'
+          "Create account"
         )}
       </Button>
 
@@ -195,12 +193,11 @@ export function RegisterForm() {
       <GoogleOAuthButton className="w-full" />
 
       <div className="text-center text-sm">
-        Already have an account?{' '}
+        Already have an account?{" "}
         <Link href="/login" className="text-primary hover:underline">
           Log in
         </Link>
       </div>
     </form>
-  )
+  );
 }
-

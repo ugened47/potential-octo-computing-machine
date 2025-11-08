@@ -1,6 +1,6 @@
 """Video API endpoints."""
 
-from typing import Any, List, Optional
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -166,8 +166,9 @@ async def create_video(
     try:
         # Lazy import to avoid circular dependency
         from app.worker import enqueue_extract_video_metadata
+
         await enqueue_extract_video_metadata(str(video.id))
-    except Exception as e:
+    except Exception:
         # Log error but don't fail the request
         # In production, you might want to log this to a monitoring service
         # For now, we'll let the job retry mechanism handle it
@@ -176,12 +177,14 @@ async def create_video(
     return VideoRead.model_validate(video)
 
 
-@video_router.get("", response_model=List[VideoRead])
+@video_router.get("", response_model=list[VideoRead])
 async def list_videos(
-    status_filter: Optional[VideoStatus] = Query(None, alias="status"),
-    search: Optional[str] = Query(None, description="Search by title"),
-    sort_by: Optional[str] = Query("created_at", description="Sort field: created_at, title, duration"),
-    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
+    status_filter: VideoStatus | None = Query(None, alias="status"),
+    search: str | None = Query(None, description="Search by title"),
+    sort_by: str | None = Query(
+        "created_at", description="Sort field: created_at, title, duration"
+    ),
+    sort_order: str | None = Query("desc", description="Sort order: asc or desc"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -379,4 +382,3 @@ async def delete_video(
     # Delete video record (cascade will handle related records)
     await db.delete(video)
     await db.commit()
-

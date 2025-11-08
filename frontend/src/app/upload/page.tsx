@@ -1,118 +1,122 @@
-'use client'
+"use client";
 
-import { useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { UploadProgress, type UploadStatus } from '@/components/video/UploadProgress'
-import { Upload, FileVideo, X } from 'lucide-react'
+import { useState, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  UploadProgress,
+  type UploadStatus,
+} from "@/components/video/UploadProgress";
+import { Upload, FileVideo, X } from "lucide-react";
 import {
   getPresignedUrl,
   uploadToS3,
   createVideoRecord,
-} from '@/lib/video-api'
+} from "@/lib/video-api";
 import {
   validateVideoFormat,
   validateVideoSize,
   getVideoMimeType,
-} from '@/lib/validation'
-import { formatFileSize } from '@/lib/utils'
+} from "@/lib/validation";
+import { formatFileSize } from "@/lib/utils";
 
-const MAX_FILE_SIZE_MB = 2048 // 2GB
+const MAX_FILE_SIZE_MB = 2048; // 2GB
 
 export default function UploadPage() {
-  const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const uploadXhrRef = useRef<XMLHttpRequest | null>(null)
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadXhrRef = useRef<XMLHttpRequest | null>(null);
 
-  const [file, setFile] = useState<File | null>(null)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [isDragging, setIsDragging] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<UploadStatus>('preparing')
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadSpeed, setUploadSpeed] = useState(0)
-  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number>()
-  const [error, setError] = useState<string | null>(null)
-  const [videoId, setVideoId] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("preparing");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState(0);
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] =
+    useState<number>();
+  const [error, setError] = useState<string | null>(null);
+  const [videoId, setVideoId] = useState<string | null>(null);
 
   const validateFile = (fileToValidate: File): string | null => {
     if (!validateVideoFormat(fileToValidate.name)) {
-      return 'Invalid file format. Allowed formats: MP4, MOV, AVI, WebM, MKV'
+      return "Invalid file format. Allowed formats: MP4, MOV, AVI, WebM, MKV";
     }
     if (!validateVideoSize(fileToValidate.size, MAX_FILE_SIZE_MB)) {
-      return `File size exceeds ${MAX_FILE_SIZE_MB}MB limit`
+      return `File size exceeds ${MAX_FILE_SIZE_MB}MB limit`;
     }
-    return null
-  }
+    return null;
+  };
 
   const handleFileSelect = (selectedFile: File) => {
-    const validationError = validateFile(selectedFile)
+    const validationError = validateFile(selectedFile);
     if (validationError) {
-      setError(validationError)
-      return
+      setError(validationError);
+      return;
     }
 
-    setFile(selectedFile)
-    setTitle(selectedFile.name.replace(/\.[^/.]+$/, '')) // Remove extension
-    setError(null)
-  }
+    setFile(selectedFile);
+    setTitle(selectedFile.name.replace(/\.[^/.]+$/, "")); // Remove extension
+    setError(null);
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(true)
-  }, [])
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }, [])
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-    const droppedFile = e.dataTransfer.files[0]
+    const droppedFile = e.dataTransfer.files[0];
     if (droppedFile) {
-      handleFileSelect(droppedFile)
+      handleFileSelect(droppedFile);
     }
-  }, [])
+  }, []);
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0]
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      handleFileSelect(selectedFile)
+      handleFileSelect(selectedFile);
     }
-  }
+  };
 
   const calculateUploadSpeed = (
     loaded: number,
     total: number,
-    startTime: number
+    startTime: number,
   ) => {
-    const elapsed = (Date.now() - startTime) / 1000 // seconds
-    const speedMBps = loaded / (1024 * 1024) / elapsed
-    setUploadSpeed(speedMBps)
+    const elapsed = (Date.now() - startTime) / 1000; // seconds
+    const speedMBps = loaded / (1024 * 1024) / elapsed;
+    setUploadSpeed(speedMBps);
 
     if (speedMBps > 0) {
-      const remaining = total - loaded
-      const estimatedSeconds = remaining / (1024 * 1024) / speedMBps
-      setEstimatedTimeRemaining(estimatedSeconds)
+      const remaining = total - loaded;
+      const estimatedSeconds = remaining / (1024 * 1024) / speedMBps;
+      setEstimatedTimeRemaining(estimatedSeconds);
     }
-  }
+  };
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!file) return;
 
-    setError(null)
-    setUploadStatus('preparing')
-    setUploadProgress(0)
+    setError(null);
+    setUploadStatus("preparing");
+    setUploadProgress(0);
 
     try {
       // Step 1: Get presigned URL
@@ -120,79 +124,79 @@ export default function UploadPage() {
         filename: file.name,
         file_size: file.size,
         content_type: getVideoMimeType(file.name),
-      })
+      });
 
-      setVideoId(presignedResponse.video_id)
-      setUploadStatus('uploading')
+      setVideoId(presignedResponse.video_id);
+      setUploadStatus("uploading");
 
       // Step 2: Upload to S3
-      const uploadStartTime = Date.now()
+      const uploadStartTime = Date.now();
       await uploadToS3(
         presignedResponse.presigned_url,
         file,
         (progress) => {
-          setUploadProgress(progress)
+          setUploadProgress(progress);
           calculateUploadSpeed(
             (progress / 100) * file.size,
             file.size,
-            uploadStartTime
-          )
+            uploadStartTime,
+          );
         },
-        uploadXhrRef
-      )
+        uploadXhrRef,
+      );
 
-      setUploadStatus('processing')
-      setUploadProgress(100)
+      setUploadStatus("processing");
+      setUploadProgress(100);
 
       // Step 3: Create video record
       await createVideoRecord({
         video_id: presignedResponse.video_id,
-        title: title || file.name.replace(/\.[^/.]+$/, ''),
+        title: title || file.name.replace(/\.[^/.]+$/, ""),
         description: description || null,
         s3_key: presignedResponse.s3_key,
-      })
+      });
 
-      setUploadStatus('complete')
+      setUploadStatus("complete");
 
       // Redirect to dashboard after a short delay
       setTimeout(() => {
-        router.push('/dashboard')
-      }, 2000)
+        router.push("/dashboard");
+      }, 2000);
     } catch (err) {
-      setUploadStatus('error')
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setUploadStatus("error");
+      setError(err instanceof Error ? err.message : "Upload failed");
     }
-  }
+  };
 
   const handleCancel = () => {
     if (uploadXhrRef.current) {
-      uploadXhrRef.current.abort()
-      uploadXhrRef.current = null
+      uploadXhrRef.current.abort();
+      uploadXhrRef.current = null;
     }
-    setUploadStatus('preparing')
-    setUploadProgress(0)
-    setError('Upload cancelled')
-  }
+    setUploadStatus("preparing");
+    setUploadProgress(0);
+    setError("Upload cancelled");
+  };
 
   const handleRetry = () => {
-    setError(null)
-    setUploadStatus('preparing')
-    setUploadProgress(0)
-    handleUpload()
-  }
+    setError(null);
+    setUploadStatus("preparing");
+    setUploadProgress(0);
+    handleUpload();
+  };
 
   const handleReset = () => {
-    setFile(null)
-    setTitle('')
-    setDescription('')
-    setUploadStatus('preparing')
-    setUploadProgress(0)
-    setError(null)
-    setVideoId(null)
+    setFile(null);
+    setTitle("");
+    setDescription("");
+    setUploadStatus("preparing");
+    setUploadProgress(0);
+    setError(null);
+    setVideoId(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   return (
     <ProtectedRoute>
@@ -204,8 +208,8 @@ export default function UploadPage() {
           <Card
             className={`border-2 border-dashed transition-colors ${
               isDragging
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25'
+                ? "border-primary bg-primary/5"
+                : "border-muted-foreground/25"
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -233,14 +237,15 @@ export default function UploadPage() {
                 className="hidden"
               />
               <p className="text-xs text-muted-foreground mt-4">
-                Supported formats: MP4, MOV, AVI, WebM, MKV (max {MAX_FILE_SIZE_MB}MB)
+                Supported formats: MP4, MOV, AVI, WebM, MKV (max{" "}
+                {MAX_FILE_SIZE_MB}MB)
               </p>
             </CardContent>
           </Card>
         )}
 
         {/* File selected view */}
-        {file && uploadStatus === 'preparing' && (
+        {file && uploadStatus === "preparing" && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -256,10 +261,12 @@ export default function UploadPage() {
                 <div className="flex-1">
                   <p className="font-medium">{file.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {formatFileSize(file.size)} • {file.type || 'Unknown type'}
+                    {formatFileSize(file.size)} • {file.type || "Unknown type"}
                   </p>
                 </div>
-                <Badge variant="outline">{file.name.split('.').pop()?.toUpperCase()}</Badge>
+                <Badge variant="outline">
+                  {file.name.split(".").pop()?.toUpperCase()}
+                </Badge>
               </div>
 
               <div className="space-y-2">
@@ -301,10 +308,10 @@ export default function UploadPage() {
         )}
 
         {/* Upload progress */}
-        {(uploadStatus === 'uploading' ||
-          uploadStatus === 'processing' ||
-          uploadStatus === 'complete' ||
-          uploadStatus === 'error') && (
+        {(uploadStatus === "uploading" ||
+          uploadStatus === "processing" ||
+          uploadStatus === "complete" ||
+          uploadStatus === "error") && (
           <Card>
             <CardHeader>
               <CardTitle>Upload Progress</CardTitle>
@@ -324,6 +331,5 @@ export default function UploadPage() {
         )}
       </div>
     </ProtectedRoute>
-  )
+  );
 }
-

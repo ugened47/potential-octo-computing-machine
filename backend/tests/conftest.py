@@ -1,28 +1,28 @@
 """Pytest configuration and fixtures."""
 
 import asyncio
-from typing import AsyncGenerator, Generator
-
-import pytest
-import pytest_asyncio
-from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
-from sqlmodel import SQLModel
-
-from app.core.config import settings
-from app.core.db import get_session
-from app.main import app
-# Import all models to ensure they're registered with SQLModel
-from app.models import User, Video, Transcript, Clip  # noqa: F401
 
 # Test database URL (use PostgreSQL for tests to support ARRAY types)
 # Can be overridden with TEST_DATABASE_URL environment variable
 import os
+from collections.abc import AsyncGenerator, Generator
+
+import pytest
+import pytest_asyncio
+from fastapi.testclient import TestClient
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from sqlmodel import SQLModel
+
+from app.core.db import get_session
+from app.main import app
+
+# Import all models to ensure they're registered with SQLModel
+from app.models import Clip, Transcript, User, Video  # noqa: F401
+
 TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/videodb_test"
+    "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/videodb_test"
 )
 
 
@@ -49,16 +49,14 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.drop_all)
         await conn.run_sync(SQLModel.metadata.create_all)
-    
+
     # Force a new connection to verify tables exist
     async with engine.connect() as check_conn:
         await check_conn.execute(text("SELECT 1 FROM videos LIMIT 1"))
         await check_conn.close()
 
     # Create async session factory
-    async_session_maker = sessionmaker(
-        engine, class_=AsyncSession, expire_on_commit=False
-    )
+    async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     # Create session
     async with async_session_maker() as session:

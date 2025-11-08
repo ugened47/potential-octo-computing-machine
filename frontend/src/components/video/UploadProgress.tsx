@@ -1,20 +1,25 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
-import { AlertCircle, RefreshCw, X, Upload, CheckCircle2 } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, RefreshCw, X, Upload, CheckCircle2 } from "lucide-react";
 
-export type UploadStatus = 'preparing' | 'uploading' | 'processing' | 'complete' | 'error'
+export type UploadStatus =
+  | "preparing"
+  | "uploading"
+  | "processing"
+  | "complete"
+  | "error";
 
 interface UploadProgressProps {
-  progress: number // 0-100
-  status: UploadStatus
-  uploadSpeed?: number // MB/s
-  estimatedTimeRemaining?: number // seconds
-  error?: string | null
-  onRetry?: () => void
-  onCancel?: () => void
+  progress: number; // 0-100
+  status: UploadStatus;
+  uploadSpeed?: number; // MB/s
+  estimatedTimeRemaining?: number; // seconds
+  error?: string | null;
+  onRetry?: () => void;
+  onCancel?: () => void;
 }
 
 export function UploadProgress({
@@ -28,42 +33,42 @@ export function UploadProgress({
 }: UploadProgressProps) {
   const getStatusIcon = () => {
     switch (status) {
-      case 'complete':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-destructive" />
-      case 'uploading':
-        return <Upload className="h-4 w-4 animate-pulse" />
+      case "complete":
+        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+      case "error":
+        return <AlertCircle className="h-4 w-4 text-destructive" />;
+      case "uploading":
+        return <Upload className="h-4 w-4 animate-pulse" />;
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   const getStatusText = () => {
     switch (status) {
-      case 'preparing':
-        return 'Preparing upload...'
-      case 'uploading':
-        return 'Uploading...'
-      case 'processing':
-        return 'Processing...'
-      case 'complete':
-        return 'Upload complete!'
-      case 'error':
-        return 'Upload failed'
+      case "preparing":
+        return "Preparing upload...";
+      case "uploading":
+        return "Uploading...";
+      case "processing":
+        return "Processing...";
+      case "complete":
+        return "Upload complete!";
+      case "error":
+        return "Upload failed";
       default:
-        return 'Unknown status'
+        return "Unknown status";
     }
-  }
+  };
 
   const formatTime = (seconds: number) => {
     if (seconds < 60) {
-      return `${Math.ceil(seconds)}s`
+      return `${Math.ceil(seconds)}s`;
     }
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = Math.ceil(seconds % 60)
-    return `${minutes}m ${remainingSeconds}s`
-  }
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.ceil(seconds % 60);
+    return `${minutes}m ${remainingSeconds}s`;
+  };
 
   return (
     <div className="space-y-4 p-4">
@@ -80,11 +85,9 @@ export function UploadProgress({
       </div>
 
       {/* Upload speed and time remaining */}
-      {(status === 'uploading' || status === 'processing') && (
+      {(status === "uploading" || status === "processing") && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          {uploadSpeed && (
-            <span>Speed: {uploadSpeed.toFixed(2)} MB/s</span>
-          )}
+          {uploadSpeed && <span>Speed: {uploadSpeed.toFixed(2)} MB/s</span>}
           {estimatedTimeRemaining && (
             <span>Time remaining: {formatTime(estimatedTimeRemaining)}</span>
           )}
@@ -101,13 +104,13 @@ export function UploadProgress({
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {status === 'error' && onRetry && (
+        {status === "error" && onRetry && (
           <Button onClick={onRetry} variant="outline" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" />
             Retry Upload
           </Button>
         )}
-        {(status === 'preparing' || status === 'uploading') && onCancel && (
+        {(status === "preparing" || status === "uploading") && onCancel && (
           <Button onClick={onCancel} variant="outline" size="sm">
             <X className="mr-2 h-4 w-4" />
             Cancel
@@ -115,6 +118,5 @@ export function UploadProgress({
         )}
       </div>
     </div>
-  )
+  );
 }
-

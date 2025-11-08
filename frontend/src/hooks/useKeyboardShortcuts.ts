@@ -1,17 +1,17 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
+import { useEffect } from "react";
 
 interface KeyboardShortcuts {
-  [key: string]: () => void
+  [key: string]: () => void;
 }
 
 export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcuts,
-  enabled: boolean = true
+  enabled: boolean = true,
 ) {
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs
@@ -20,31 +20,30 @@ export function useKeyboardShortcuts(
         event.target instanceof HTMLTextAreaElement ||
         (event.target as HTMLElement).isContentEditable
       ) {
-        return
+        return;
       }
 
-      const key = event.key.toLowerCase()
-      const modifier = event.shiftKey ? 'shift+' : ''
-      const keyCombo = `${modifier}${key}`
+      const key = event.key.toLowerCase();
+      const modifier = event.shiftKey ? "shift+" : "";
+      const keyCombo = `${modifier}${key}`;
 
       // Check for exact matches first
       if (shortcuts[keyCombo]) {
-        event.preventDefault()
-        shortcuts[keyCombo]()
-        return
+        event.preventDefault();
+        shortcuts[keyCombo]();
+        return;
       }
 
       // Check for key without modifier
       if (shortcuts[key]) {
-        event.preventDefault()
-        shortcuts[key]()
+        event.preventDefault();
+        shortcuts[key]();
       }
-    }
+    };
 
-    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [shortcuts, enabled])
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [shortcuts, enabled]);
 }
-

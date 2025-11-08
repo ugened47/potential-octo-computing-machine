@@ -1,18 +1,22 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import { Stage, Layer, Rect, Line, Group, Text } from 'react-konva'
-import type { Segment } from '@/types/timeline'
+import { useEffect, useRef, useState } from "react";
+import { Stage, Layer, Rect, Line, Group, Text } from "react-konva";
+import type { Segment } from "@/types/timeline";
 
 interface TimelineEditorProps {
-  duration: number
-  currentTime: number
-  segments: Segment[]
-  zoomLevel: number
-  onSeek: (time: number) => void
-  onSegmentClick?: (segmentId: string) => void
-  onSegmentDrag?: (segmentId: string, startTime: number, endTime: number) => void
-  className?: string
+  duration: number;
+  currentTime: number;
+  segments: Segment[];
+  zoomLevel: number;
+  onSeek: (time: number) => void;
+  onSegmentClick?: (segmentId: string) => void;
+  onSegmentDrag?: (
+    segmentId: string,
+    startTime: number,
+    endTime: number,
+  ) => void;
+  className?: string;
 }
 
 export function TimelineEditor({
@@ -23,37 +27,37 @@ export function TimelineEditor({
   onSeek,
   onSegmentClick,
   onSegmentDrag,
-  className = '',
+  className = "",
 }: TimelineEditorProps) {
-  const stageRef = useRef<any>(null)
-  const [width, setWidth] = useState(800)
-  const [height, setHeight] = useState(120)
+  const stageRef = useRef<any>(null);
+  const [width, setWidth] = useState(800);
+  const [height, setHeight] = useState(120);
 
   useEffect(() => {
     const updateSize = () => {
       if (stageRef.current) {
-        const container = stageRef.current.container()
+        const container = stageRef.current.container();
         if (container) {
-          setWidth(container.offsetWidth || 800)
+          setWidth(container.offsetWidth || 800);
         }
       }
-    }
+    };
 
-    updateSize()
-    window.addEventListener('resize', updateSize)
-    return () => window.removeEventListener('resize', updateSize)
-  }, [])
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
-  const pixelsPerSecond = (width / duration) * zoomLevel
-  const playheadX = currentTime * pixelsPerSecond
+  const pixelsPerSecond = (width / duration) * zoomLevel;
+  const playheadX = currentTime * pixelsPerSecond;
 
   const handleStageClick = (e: any) => {
-    const stage = e.target.getStage()
-    const pointerPos = stage.getPointerPosition()
-    const clickedTime = (pointerPos.x / pixelsPerSecond) * zoomLevel
-    const clampedTime = Math.max(0, Math.min(clickedTime, duration))
-    onSeek(clampedTime)
-  }
+    const stage = e.target.getStage();
+    const pointerPos = stage.getPointerPosition();
+    const clickedTime = (pointerPos.x / pixelsPerSecond) * zoomLevel;
+    const clampedTime = Math.max(0, Math.min(clickedTime, duration));
+    onSeek(clampedTime);
+  };
 
   return (
     <div className={`w-full ${className}`}>
@@ -70,8 +74,8 @@ export function TimelineEditor({
 
           {/* Time markers */}
           {Array.from({ length: Math.floor(duration) + 1 }).map((_, i) => {
-            const x = (i / duration) * width * zoomLevel
-            if (x > width) return null
+            const x = (i / duration) * width * zoomLevel;
+            if (x > width) return null;
             return (
               <Group key={i}>
                 <Line
@@ -87,14 +91,16 @@ export function TimelineEditor({
                   fill="#94a3b8"
                 />
               </Group>
-            )
+            );
           })}
 
           {/* Segments */}
           {segments.map((segment) => {
-            const segmentStartX = (segment.start_time / duration) * width * zoomLevel
-            const segmentEndX = (segment.end_time / duration) * width * zoomLevel
-            const segmentWidth = segmentEndX - segmentStartX
+            const segmentStartX =
+              (segment.start_time / duration) * width * zoomLevel;
+            const segmentEndX =
+              (segment.end_time / duration) * width * zoomLevel;
+            const segmentWidth = segmentEndX - segmentStartX;
 
             return (
               <Group
@@ -103,27 +109,28 @@ export function TimelineEditor({
                 y={20}
                 draggable
                 onDragEnd={(e) => {
-                  const newStartX = Math.max(0, e.target.x())
-                  const newStartTime = (newStartX / pixelsPerSecond) * zoomLevel
-                  const segmentDuration = segment.end_time - segment.start_time
+                  const newStartX = Math.max(0, e.target.x());
+                  const newStartTime =
+                    (newStartX / pixelsPerSecond) * zoomLevel;
+                  const segmentDuration = segment.end_time - segment.start_time;
                   const newEndTime = Math.min(
                     duration,
-                    newStartTime + segmentDuration
-                  )
+                    newStartTime + segmentDuration,
+                  );
                   if (onSegmentDrag) {
-                    onSegmentDrag(segment.id, newStartTime, newEndTime)
+                    onSegmentDrag(segment.id, newStartTime, newEndTime);
                   }
                 }}
                 onClick={() => {
                   if (onSegmentClick) {
-                    onSegmentClick(segment.id)
+                    onSegmentClick(segment.id);
                   }
                 }}
               >
                 <Rect
                   width={segmentWidth}
                   height={60}
-                  fill={segment.selected ? '#3b82f6' : '#475569'}
+                  fill={segment.selected ? "#3b82f6" : "#475569"}
                   stroke="#64748b"
                   strokeWidth={1}
                   cornerRadius={4}
@@ -136,7 +143,7 @@ export function TimelineEditor({
                   fill="#ffffff"
                 />
               </Group>
-            )
+            );
           })}
 
           {/* Playhead */}
@@ -149,6 +156,5 @@ export function TimelineEditor({
         </Layer>
       </Stage>
     </div>
-  )
+  );
 }
-
