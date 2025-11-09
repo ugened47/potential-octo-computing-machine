@@ -1,19 +1,25 @@
-import { ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface OnboardingStepProps {
-  title: string
-  description: string
-  children: ReactNode
-  step: number
-  totalSteps: number
-  onNext: () => void
-  onPrevious: () => void
-  onSkip: () => void
-  isFirst: boolean
-  isLast: boolean
+  title: string;
+  description: string;
+  children: ReactNode;
+  step: number;
+  totalSteps: number;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSkip: () => void;
+  isFirst: boolean;
+  isLast: boolean;
 }
 
 export function OnboardingStep({
@@ -46,7 +52,7 @@ export function OnboardingStep({
               <div
                 key={i}
                 className={`h-2 flex-1 rounded-full transition-colors ${
-                  i <= step ? 'bg-primary' : 'bg-muted'
+                  i <= step ? "bg-primary" : "bg-muted"
                 }`}
               />
             ))}
@@ -59,21 +65,16 @@ export function OnboardingStep({
       <CardContent className="space-y-6">
         {children}
         <div className="flex items-center justify-between pt-4">
-          <Button
-            variant="outline"
-            onClick={onPrevious}
-            disabled={isFirst}
-          >
+          <Button variant="outline" onClick={onPrevious} disabled={isFirst}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Previous
           </Button>
           <Button onClick={onNext}>
-            {isLast ? 'Get Started' : 'Next'}
+            {isLast ? "Get Started" : "Next"}
             {!isLast && <ChevronRight className="h-4 w-4 ml-2" />}
           </Button>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
-

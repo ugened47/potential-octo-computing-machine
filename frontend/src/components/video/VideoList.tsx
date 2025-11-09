@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useRouter } from 'next/navigation'
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -8,34 +8,38 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Play, Edit, Trash2 } from 'lucide-react'
-import type { Video } from '@/types/video'
-import { formatFileSize, formatDuration, formatRelativeTime } from '@/lib/utils'
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Play, Edit, Trash2 } from "lucide-react";
+import type { Video } from "@/types/video";
+import {
+  formatFileSize,
+  formatDuration,
+  formatRelativeTime,
+} from "@/lib/utils";
 
 interface VideoListProps {
-  videos: Video[]
-  onDelete?: (videoId: string) => void
-  onEdit?: (videoId: string) => void
+  videos: Video[];
+  onDelete?: (videoId: string) => void;
+  onEdit?: (videoId: string) => void;
 }
 
 export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
-  const router = useRouter()
+  const router = useRouter();
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'completed':
-        return 'default'
-      case 'processing':
-        return 'secondary'
-      case 'failed':
-        return 'destructive'
+      case "completed":
+        return "default";
+      case "processing":
+        return "secondary";
+      case "failed":
+        return "destructive";
       default:
-        return 'outline'
+        return "outline";
     }
-  }
+  };
 
   if (videos.length === 0) {
     return (
@@ -45,7 +49,7 @@ export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
           Upload your first video to get started
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -86,10 +90,10 @@ export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
               </TableCell>
               <TableCell className="font-medium">{video.title}</TableCell>
               <TableCell>
-                {video.duration ? formatDuration(video.duration) : '-'}
+                {video.duration ? formatDuration(video.duration) : "-"}
               </TableCell>
               <TableCell>
-                {video.file_size ? formatFileSize(video.file_size) : '-'}
+                {video.file_size ? formatFileSize(video.file_size) : "-"}
               </TableCell>
               <TableCell>{formatRelativeTime(video.created_at)}</TableCell>
               <TableCell>
@@ -103,8 +107,8 @@ export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
                     variant="ghost"
                     size="icon"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      if (onEdit) onEdit(video.id)
+                      e.stopPropagation();
+                      if (onEdit) onEdit(video.id);
                     }}
                     title="Edit"
                   >
@@ -114,8 +118,8 @@ export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
                     variant="ghost"
                     size="icon"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      if (onDelete) onDelete(video.id)
+                      e.stopPropagation();
+                      if (onDelete) onDelete(video.id);
                     }}
                     title="Delete"
                   >
@@ -128,6 +132,5 @@ export function VideoList({ videos, onDelete, onEdit }: VideoListProps) {
         </TableBody>
       </Table>
     </div>
-  )
+  );
 }
-
