@@ -119,12 +119,15 @@ class TranscriptionService:
         await self.db.refresh(transcript)
         return transcript
 
-    def extract_audio_from_video(self, video_path: str, output_path: str) -> None:
+    def extract_audio_from_video(
+        self, video_path: str, output_path: str, convert_to_mono: bool = True
+    ) -> None:
         """Extract audio track from video file.
 
         Args:
             video_path: Path to video file
             output_path: Path to save extracted audio file
+            convert_to_mono: Convert stereo to mono for cost optimization (default: True)
         """
         container = av.open(video_path)
         audio_stream = None
@@ -137,11 +140,22 @@ class TranscriptionService:
         if not audio_stream:
             raise ValueError("No audio stream found in video")
 
-        # Extract audio
+        # Extract audio - optimize for Whisper API
         output_container = av.open(output_path, mode="w")
-        output_stream = output_container.add_stream("mp3", rate=16000)
+
+        # Use mono to reduce costs by ~50%
+        # Whisper charges per minute of audio, stereo = 2x cost
+        if convert_to_mono:
+            output_stream = output_container.add_stream("mp3", rate=16000)
+            output_stream.channels = 1  # Force mono
+        else:
+            output_stream = output_container.add_stream("mp3", rate=16000)
 
         for frame in container.decode(audio_stream):
+            # Convert stereo to mono if needed
+            if convert_to_mono and frame.layout.channels > 1:
+                frame = frame.reformat(layout="mono")
+
             frame.pts = None
             for packet in output_stream.encode(frame):
                 output_container.mux(packet)
@@ -163,43 +177,217 @@ class TranscriptionService:
         self.s3_client.download_file(settings.s3_bucket, s3_key, local_path)
 
     async def transcribe_audio(
-        self, audio_path: str, language: Optional[str] = None
+        self, audio_path: str, language: Optional[str] = None, max_retries: int = 4
     ) -> dict[str, Any]:
-        """Transcribe audio file using OpenAI Whisper API.
+        """Transcribe audio file using OpenAI Whisper API with retry logic.
 
         Args:
             audio_path: Path to audio file
             language: Optional language code hint (ISO 639-1)
+            max_retries: Maximum number of retry attempts (default: 4)
 
         Returns:
             Transcription result with text and word timestamps
-        """
-        with open(audio_path, "rb") as audio_file:
-            transcript_response = self.openai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="verbose_json",
-                timestamp_granularities=["word"],
-                language=language,
-            )
 
-        # Extract word timestamps from response
-        word_timestamps = {
-            "words": [
-                {
-                    "word": word["word"],
-                    "start": word["start"],
-                    "end": word["end"],
-                    "confidence": getattr(word, "probability", None),
+        Raises:
+            Exception: If transcription fails after all retries
+        """
+        import time
+        from openai import APIError, APIConnectionError, RateLimitError
+
+        last_error = None
+
+        for attempt in range(max_retries + 1):
+            try:
+                with open(audio_path, "rb") as audio_file:
+                    transcript_response = self.openai_client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        response_format="verbose_json",
+                        timestamp_granularities=["word"],
+                        language=language,
+                    )
+
+                # Extract word timestamps from response
+                word_timestamps = {
+                    "words": [
+                        {
+                            "word": word["word"],
+                            "start": word["start"],
+                            "end": word["end"],
+                            "confidence": getattr(word, "probability", None),
+                        }
+                        for word in transcript_response.words
+                    ]
                 }
-                for word in transcript_response.words
-            ]
-        }
+
+                return {
+                    "text": transcript_response.text,
+                    "language": transcript_response.language,
+                    "word_timestamps": word_timestamps,
+                }
+
+            except (APIError, APIConnectionError, RateLimitError) as e:
+                last_error = e
+
+                # Don't retry on client errors (400)
+                if hasattr(e, "status_code") and e.status_code == 400:
+                    raise
+
+                # If we've exhausted retries, raise the error
+                if attempt >= max_retries:
+                    break
+
+                # Exponential backoff: 1s, 2s, 4s, 8s
+                wait_time = 2**attempt
+                time.sleep(wait_time)
+
+                continue
+
+            except Exception as e:
+                # Don't retry on unexpected errors
+                raise
+
+        # If we get here, all retries failed
+        raise Exception(f"Transcription failed after {max_retries + 1} attempts") from last_error
+
+    def split_audio_file(
+        self, audio_path: str, chunk_size_mb: int = 20
+    ) -> list[tuple[str, float]]:
+        """Split audio file into chunks if larger than chunk_size_mb.
+
+        Args:
+            audio_path: Path to audio file
+            chunk_size_mb: Maximum chunk size in MB (default: 20)
+
+        Returns:
+            List of tuples (chunk_path, start_offset_seconds)
+        """
+        # Check file size
+        file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
+
+        if file_size_mb <= chunk_size_mb:
+            # File is small enough, return as single chunk
+            return [(audio_path, 0.0)]
+
+        # Split into chunks
+        chunks = []
+        container = av.open(audio_path)
+
+        # Get audio stream
+        audio_stream = None
+        for stream in container.streams.audio:
+            audio_stream = stream
+            break
+
+        if not audio_stream:
+            raise ValueError("No audio stream found")
+
+        # Calculate chunk duration based on file size and bitrate
+        # Target: chunk_size_mb per chunk
+        total_duration = container.duration / av.time_base if container.duration else 0
+        num_chunks = int(file_size_mb / chunk_size_mb) + 1
+        chunk_duration = total_duration / num_chunks
+
+        current_time = 0.0
+        chunk_index = 0
+
+        while current_time < total_duration:
+            # Create chunk file
+            chunk_path = tempfile.NamedTemporaryFile(
+                delete=False, suffix=f"_chunk_{chunk_index}.mp3"
+            ).name
+
+            # Open output container
+            output_container = av.open(chunk_path, mode="w")
+            output_stream = output_container.add_stream("mp3", rate=16000)
+            output_stream.channels = 1  # Mono
+
+            # Seek to start time
+            container.seek(int(current_time * av.time_base))
+
+            end_time = min(current_time + chunk_duration, total_duration)
+
+            # Write frames for this chunk
+            for frame in container.decode(audio_stream):
+                if frame.time < current_time:
+                    continue
+                if frame.time >= end_time:
+                    break
+
+                # Convert to mono
+                if frame.layout.channels > 1:
+                    frame = frame.reformat(layout="mono")
+
+                frame.pts = None
+                for packet in output_stream.encode(frame):
+                    output_container.mux(packet)
+
+            # Flush
+            for packet in output_stream.encode():
+                output_container.mux(packet)
+
+            output_container.close()
+
+            chunks.append((chunk_path, current_time))
+            current_time = end_time
+            chunk_index += 1
+
+        container.close()
+
+        return chunks
+
+    async def transcribe_audio_chunked(
+        self, audio_path: str, language: Optional[str] = None, chunk_size_mb: int = 20
+    ) -> dict[str, Any]:
+        """Transcribe audio file with chunking for large files.
+
+        Args:
+            audio_path: Path to audio file
+            language: Optional language code hint
+            chunk_size_mb: Maximum chunk size in MB (default: 20)
+
+        Returns:
+            Combined transcription result
+        """
+        # Split into chunks if needed
+        chunks = self.split_audio_file(audio_path, chunk_size_mb)
+
+        if len(chunks) == 1:
+            # Single chunk, use normal transcription
+            return await self.transcribe_audio(audio_path, language)
+
+        # Transcribe each chunk and merge results
+        full_text_parts = []
+        all_words = []
+
+        for chunk_path, time_offset in chunks:
+            try:
+                # Transcribe chunk
+                chunk_result = await self.transcribe_audio(chunk_path, language)
+
+                # Add text
+                full_text_parts.append(chunk_result["text"])
+
+                # Add words with time offset
+                for word in chunk_result["word_timestamps"]["words"]:
+                    word_with_offset = {
+                        "word": word["word"],
+                        "start": word["start"] + time_offset,
+                        "end": word["end"] + time_offset,
+                        "confidence": word["confidence"],
+                    }
+                    all_words.append(word_with_offset)
+
+            finally:
+                # Clean up chunk file (unless it's the original file)
+                if chunk_path != audio_path and os.path.exists(chunk_path):
+                    os.unlink(chunk_path)
 
         return {
-            "text": transcript_response.text,
-            "language": transcript_response.language,
-            "word_timestamps": word_timestamps,
+            "text": " ".join(full_text_parts),
+            "language": language or "en",  # Use detected language from first chunk
+            "word_timestamps": {"words": all_words},
         }
 
     async def transcribe_video(
@@ -249,24 +437,15 @@ class TranscriptionService:
                 audio_path = audio_file.name
 
             try:
-                self.extract_audio_from_video(video_path, audio_path)
-
-                # Check file size (Whisper supports up to 25MB)
-                file_size_mb = os.path.getsize(audio_path) / (1024 * 1024)
-                if file_size_mb > 25:
-                    # For now, raise error - chunking can be added later
-                    raise ValueError(
-                        f"Audio file too large ({file_size_mb:.2f}MB). "
-                        "Whisper supports up to 25MB."
-                    )
+                self.extract_audio_from_video(video_path, audio_path, convert_to_mono=True)
 
                 # Update progress: Transcribing
                 if update_progress:
                     update_progress(50)
 
-                # Transcribe audio
-                transcription_result = await self.transcribe_audio(
-                    audio_path, language=None  # Auto-detect language
+                # Transcribe audio with automatic chunking for large files
+                transcription_result = await self.transcribe_audio_chunked(
+                    audio_path, language=None, chunk_size_mb=20
                 )
 
                 # Update progress: Saving
