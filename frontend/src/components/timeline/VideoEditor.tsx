@@ -1,13 +1,19 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { VideoPlayer } from './VideoPlayer'
 import { WaveformDisplay } from './WaveformDisplay'
 import { TimelineEditor } from './TimelineEditor'
 import { TimelineControls } from './TimelineControls'
 import { TranscriptPanel } from '@/components/transcript/TranscriptPanel'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
-import { getWaveform, generateWaveform, getWaveformStatus } from '@/lib/timeline-api'
+import {
+  getWaveform,
+  generateWaveform,
+  getWaveformStatus,
+  saveSegments,
+  getSegments,
+} from '@/lib/timeline-api'
 import { getVideoPlaybackUrl } from '@/lib/video-api'
 import type { WaveformData, Segment } from '@/types/timeline'
 import type { Video } from '@/types/video'
@@ -28,6 +34,9 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
   const [playbackRate, setPlaybackRate] = useState(1.0)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [segments, setSegments] = useState<Segment[]>([])
+  const [isSavingSegments, setIsSavingSegments] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Load video playback URL
   useEffect(() => {
@@ -54,7 +63,7 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
         setWaveformData(data)
       } catch (error: any) {
         // Waveform doesn't exist, try to generate it
-        if (error.response?.status === 404) {
+        if (error.status === 404 || error.response?.status === 404) {
           try {
             setIsGeneratingWaveform(true)
             await generateWaveform(video.id)
@@ -102,6 +111,70 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
       loadWaveform()
     }
   }, [video.id, video.duration])
+
+  // Load saved segments
+  useEffect(() => {
+    const loadSegments = async () => {
+      try {
+        const savedSegments = await getSegments(video.id)
+        if (savedSegments && savedSegments.length > 0) {
+          setSegments(savedSegments)
+        }
+      } catch (error) {
+        console.error('Failed to load segments:', error)
+      }
+    }
+
+    if (video.id) {
+      loadSegments()
+    }
+  }, [video.id])
+
+  // Autosave segments every 30 seconds
+  useEffect(() => {
+    const saveSegmentsToServer = async () => {
+      if (segments.length === 0) return
+
+      try {
+        setIsSavingSegments(true)
+        await saveSegments(video.id, segments)
+        setLastSavedAt(new Date())
+      } catch (error) {
+        console.error('Failed to autosave segments:', error)
+      } finally {
+        setIsSavingSegments(false)
+      }
+    }
+
+    // Clear existing timer
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current)
+    }
+
+    // Set new timer for 30 seconds
+    autosaveTimerRef.current = setTimeout(() => {
+      saveSegmentsToServer()
+    }, 30000)
+
+    // Cleanup on unmount
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current)
+      }
+    }
+  }, [segments, video.id])
+
+  // Save segments before unmount
+  useEffect(() => {
+    return () => {
+      // Save segments on unmount if there are any
+      if (segments.length > 0) {
+        saveSegments(video.id, segments).catch((error) => {
+          console.error('Failed to save segments on unmount:', error)
+        })
+      }
+    }
+  }, [segments, video.id])
 
   const handlePlayPause = useCallback(() => {
     setIsPlaying((prev) => !prev)
@@ -191,21 +264,39 @@ export function VideoEditor({ video, className = '' }: VideoEditorProps) {
       </div>
 
       {/* Timeline Controls */}
-      <TimelineControls
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        playbackRate={playbackRate}
-        zoomLevel={zoomLevel}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-        onSeekBackward={handleSeekBackward}
-        onSeekForward={handleSeekForward}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onPlaybackRateChange={setPlaybackRate}
-      />
+      <div className="relative">
+        <TimelineControls
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          playbackRate={playbackRate}
+          zoomLevel={zoomLevel}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          onSeekBackward={handleSeekBackward}
+          onSeekForward={handleSeekForward}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          onPlaybackRateChange={setPlaybackRate}
+        />
+        {/* Autosave indicator */}
+        {segments.length > 0 && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            {isSavingSegments ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500"></span>
+                Saving...
+              </span>
+            ) : lastSavedAt ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+                Saved {new Date(lastSavedAt).toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {/* Waveform */}
       {isLoadingWaveform || isGeneratingWaveform ? (
