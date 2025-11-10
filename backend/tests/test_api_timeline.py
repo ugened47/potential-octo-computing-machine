@@ -1,10 +1,10 @@
 """Tests for timeline API endpoints."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
 from app.models.user import User
 from app.models.video import Video, VideoStatus
@@ -33,6 +33,7 @@ def auth_headers(test_user: User) -> dict:
         return test_user
 
     from app.main import app
+
     app.dependency_overrides[get_current_user] = override_get_current_user
     return {"Authorization": "Bearer test-token"}
 
@@ -42,7 +43,7 @@ async def test_video(db_session: AsyncSession, test_user: User) -> Video:
     """Create a test video."""
     await db_session.commit()
     await db_session.refresh(test_user)
-    
+
     video = Video(
         user_id=test_user.id,
         title="Test Video",
@@ -58,7 +59,11 @@ async def test_video(db_session: AsyncSession, test_user: User) -> Video:
 
 @pytest.mark.asyncio
 async def test_get_waveform_not_found(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test GET /api/videos/{id}/timeline/waveform returns 404 when waveform doesn't exist."""
     with patch("app.api.routes.timeline.WaveformService") as mock_service_class:
@@ -77,7 +82,11 @@ async def test_get_waveform_not_found(
 
 @pytest.mark.asyncio
 async def test_get_waveform_success(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test GET /api/videos/{id}/timeline/waveform returns waveform data."""
     with patch("app.api.routes.timeline.WaveformService") as mock_service_class:
@@ -106,7 +115,11 @@ async def test_get_waveform_success(
 
 @pytest.mark.asyncio
 async def test_generate_waveform_already_exists(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test POST /api/videos/{id}/timeline/waveform returns completed when waveform exists."""
     with patch("app.api.routes.timeline.WaveformService") as mock_service_class:
@@ -131,7 +144,11 @@ async def test_generate_waveform_already_exists(
 
 @pytest.mark.asyncio
 async def test_get_waveform_status_completed(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test GET /api/videos/{id}/timeline/waveform/status returns completed when waveform exists."""
     with patch("app.api.routes.timeline.WaveformService") as mock_service_class:
@@ -156,7 +173,11 @@ async def test_get_waveform_status_completed(
 
 @pytest.mark.asyncio
 async def test_get_waveform_status_processing(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test GET /api/videos/{id}/timeline/waveform/status returns processing when waveform doesn't exist."""
     with patch("app.api.routes.timeline.WaveformService") as mock_service_class:
@@ -177,7 +198,11 @@ async def test_get_waveform_status_processing(
 
 @pytest.mark.asyncio
 async def test_save_segments(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test POST /api/videos/{id}/timeline/segments saves segments."""
     segments = [
@@ -212,7 +237,11 @@ async def test_save_segments(
 
 @pytest.mark.asyncio
 async def test_save_segments_invalid_time_range(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test POST /api/videos/{id}/timeline/segments validates time ranges."""
     segments = [
@@ -235,7 +264,11 @@ async def test_save_segments_invalid_time_range(
 
 @pytest.mark.asyncio
 async def test_get_segments(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test GET /api/videos/{id}/timeline/segments returns empty list (MVP implementation)."""
     response = client.get(
@@ -251,7 +284,11 @@ async def test_get_segments(
 
 @pytest.mark.asyncio
 async def test_delete_segments(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test DELETE /api/videos/{id}/timeline/segments clears segments."""
     response = client.delete(
@@ -270,9 +307,10 @@ async def test_timeline_endpoints_require_auth(
 ):
     """Test timeline endpoints require authentication."""
     from app.main import app
+
     # Clear any overrides
     app.dependency_overrides.clear()
-    
+
     endpoints = [
         ("GET", f"/api/videos/{test_video.id}/timeline/waveform"),
         ("POST", f"/api/videos/{test_video.id}/timeline/waveform"),
@@ -289,13 +327,17 @@ async def test_timeline_endpoints_require_auth(
             response = client.post(endpoint, json=[])
         elif method == "DELETE":
             response = client.delete(endpoint)
-        
+
         assert response.status_code == 401 or response.status_code == 403
 
 
 @pytest.mark.asyncio
 async def test_timeline_endpoints_verify_ownership(
-    client: TestClient, test_user: User, test_video: Video, auth_headers: dict, db_session: AsyncSession
+    client: TestClient,
+    test_user: User,
+    test_video: Video,
+    auth_headers: dict,
+    db_session: AsyncSession,
 ):
     """Test timeline endpoints verify video ownership."""
     # Create another user
@@ -327,4 +369,3 @@ async def test_timeline_endpoints_verify_ownership(
     )
 
     assert response.status_code == 403
-

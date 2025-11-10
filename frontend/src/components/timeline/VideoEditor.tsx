@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { VideoPlayer } from "./VideoPlayer";
 import { WaveformDisplay } from "./WaveformDisplay";
 import { TimelineEditor } from "./TimelineEditor";
 import { TimelineControls } from "./TimelineControls";
 import { TranscriptPanel } from "@/components/transcript/TranscriptPanel";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import {
-  getWaveform,
-  generateWaveform,
-  getWaveformStatus,
-} from "@/lib/timeline-api";
-import { getVideoPlaybackUrl } from "@/lib/video-api";
-import type { WaveformData, Segment } from "@/types/timeline";
-import type { Video } from "@/types/video";
+import { timelineAPI, type WaveformData, type Segment } from "@/lib";
+import { videoAPI, type Video } from "@/lib";
 
 interface VideoEditorProps {
   video: Video;
@@ -32,13 +26,18 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [isSavingSegments, setIsSavingSegments] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load video playback URL
   useEffect(() => {
     const loadVideoUrl = async () => {
       try {
-        const url = await getVideoPlaybackUrl(video.id);
-        setVideoUrl(url);
+        const data = await videoAPI.getVideo(video.id);
+        if (data.video_url) {
+          setVideoUrl(data.video_url);
+        }
       } catch (error) {
         console.error("Failed to load video URL:", error);
       }
@@ -54,35 +53,33 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
     const loadWaveform = async () => {
       try {
         setIsLoadingWaveform(true);
-        const data = await getWaveform(video.id);
+        const data = await timelineAPI.getWaveform(video.id);
         setWaveformData(data);
       } catch (error: any) {
         // Waveform doesn't exist, try to generate it
-        if (error.response?.status === 404) {
+        if (
+          error.message?.includes("404") ||
+          error.message?.includes("not found")
+        ) {
           try {
             setIsGeneratingWaveform(true);
-            await generateWaveform(video.id);
-            // Poll for waveform status
+            await timelineAPI.generateWaveform(video.id);
+            // Poll for waveform completion
             const pollWaveform = async () => {
               const maxAttempts = 30;
               let attempts = 0;
               const interval = setInterval(async () => {
                 attempts++;
                 try {
-                  const status = await getWaveformStatus(video.id);
-                  if (status.status === "completed") {
-                    const data = await getWaveform(video.id);
-                    setWaveformData(data);
-                    setIsGeneratingWaveform(false);
-                    clearInterval(interval);
-                  } else if (
-                    status.status === "failed" ||
-                    attempts >= maxAttempts
-                  ) {
+                  const data = await timelineAPI.getWaveform(video.id);
+                  setWaveformData(data);
+                  setIsGeneratingWaveform(false);
+                  clearInterval(interval);
+                } catch (err) {
+                  if (attempts >= maxAttempts) {
                     setIsGeneratingWaveform(false);
                     clearInterval(interval);
                   }
-                } catch (err) {
                   // Continue polling
                 }
               }, 2000);
@@ -110,6 +107,89 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
     }
   }, [video.id, video.duration]);
 
+  // Load saved segments
+  useEffect(() => {
+    const loadSegments = async () => {
+      try {
+        const savedSegments = await timelineAPI.getSegments(video.id);
+        if (savedSegments && savedSegments.length > 0) {
+          setSegments(savedSegments);
+        }
+      } catch (error) {
+        console.error("Failed to load segments:", error);
+      }
+    };
+
+    if (video.id) {
+      loadSegments();
+    }
+  }, [video.id]);
+
+  // Autosave segments every 30 seconds
+  useEffect(() => {
+    const saveSegmentsToServer = async () => {
+      if (segments.length === 0) return;
+
+      try {
+        setIsSavingSegments(true);
+        // Save each segment individually using createSegment
+        for (const segment of segments) {
+          await timelineAPI.createSegment({
+            video_id: video.id,
+            type: segment.type,
+            start: segment.start,
+            end: segment.end,
+            metadata: segment.metadata,
+          });
+        }
+        setLastSavedAt(new Date());
+      } catch (error) {
+        console.error("Failed to autosave segments:", error);
+      } finally {
+        setIsSavingSegments(false);
+      }
+    };
+
+    // Clear existing timer
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+
+    // Set new timer for 30 seconds
+    autosaveTimerRef.current = setTimeout(() => {
+      saveSegmentsToServer();
+    }, 30000);
+
+    // Cleanup on unmount
+    return () => {
+      if (autosaveTimerRef.current) {
+        clearTimeout(autosaveTimerRef.current);
+      }
+    };
+  }, [segments, video.id]);
+
+  // Save segments before unmount
+  useEffect(() => {
+    return () => {
+      // Save segments on unmount if there are any
+      if (segments.length > 0) {
+        for (const segment of segments) {
+          timelineAPI
+            .createSegment({
+              video_id: video.id,
+              type: segment.type,
+              start: segment.start,
+              end: segment.end,
+              metadata: segment.metadata,
+            })
+            .catch((error) => {
+              console.error("Failed to save segment on unmount:", error);
+            });
+        }
+      }
+    };
+  }, [segments, video.id]);
+
   const handlePlayPause = useCallback(() => {
     setIsPlaying((prev) => !prev);
   }, []);
@@ -125,9 +205,12 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
     setCurrentTime((prev) => Math.max(0, prev - seconds));
   }, []);
 
-  const handleSeekForward = useCallback((seconds: number) => {
-    setCurrentTime((prev) => Math.min(duration, prev + seconds));
-  }, []);
+  const handleSeekForward = useCallback(
+    (seconds: number) => {
+      setCurrentTime((prev) => Math.min(duration, prev + seconds));
+    },
+    [duration],
+  );
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel((prev) => Math.min(10, prev * 1.2));
@@ -154,7 +237,12 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
       setSegments((prev) =>
         prev.map((seg) =>
           seg.id === segmentId
-            ? { ...seg, start_time: startTime, end_time: endTime }
+            ? {
+                ...seg,
+                start: startTime,
+                end: endTime,
+                duration: endTime - startTime,
+              }
             : seg,
         ),
       );
@@ -201,21 +289,39 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
       </div>
 
       {/* Timeline Controls */}
-      <TimelineControls
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        playbackRate={playbackRate}
-        zoomLevel={zoomLevel}
-        onPlayPause={handlePlayPause}
-        onSeek={handleSeek}
-        onSeekBackward={handleSeekBackward}
-        onSeekForward={handleSeekForward}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onPlaybackRateChange={setPlaybackRate}
-      />
+      <div className="relative">
+        <TimelineControls
+          isPlaying={isPlaying}
+          currentTime={currentTime}
+          duration={duration}
+          playbackRate={playbackRate}
+          zoomLevel={zoomLevel}
+          onPlayPause={handlePlayPause}
+          onSeek={handleSeek}
+          onSeekBackward={handleSeekBackward}
+          onSeekForward={handleSeekForward}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          onPlaybackRateChange={setPlaybackRate}
+        />
+        {/* Autosave indicator */}
+        {segments.length > 0 && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+            {isSavingSegments ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500"></span>
+                Saving...
+              </span>
+            ) : lastSavedAt ? (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500"></span>
+                Saved {new Date(lastSavedAt).toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
+        )}
+      </div>
 
       {/* Waveform */}
       {isLoadingWaveform || isGeneratingWaveform ? (

@@ -1,7 +1,6 @@
 """Rate limiting middleware."""
 
-import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response, status
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -102,4 +101,3 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         except Exception:
             # If Redis fails, allow request (graceful degradation)
             return await call_next(request)
-

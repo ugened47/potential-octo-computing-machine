@@ -1,7 +1,5 @@
 """Authentication service layer with business logic."""
 
-from datetime import timedelta
-from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -27,7 +25,7 @@ class AuthService:
         self.db = db
 
     async def register_user(
-        self, email: str, password: str, full_name: Optional[str] = None
+        self, email: str, password: str, full_name: str | None = None
     ) -> AuthResponse:
         """
         Register a new user.
@@ -193,7 +191,7 @@ class AuthService:
             refresh_token=new_refresh_token,
         )
 
-    async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_user_by_id(self, user_id: UUID) -> User | None:
         """
         Get user by ID.
 
@@ -206,7 +204,7 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
-    async def get_user_by_email(self, email: str) -> Optional[User]:
+    async def get_user_by_email(self, email: str) -> User | None:
         """
         Get user by email.
 

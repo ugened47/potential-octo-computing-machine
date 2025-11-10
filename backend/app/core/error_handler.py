@@ -1,15 +1,14 @@
 """Centralized error handling for FastAPI application."""
 
 import logging
-from typing import Any
 
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from app.core.exceptions import AppException
 from app.core.config import settings
+from app.core.exceptions import AppException
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +138,9 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
         response_data["error"]["details"] = {"database_error": str(exc)}
 
     return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT if error_code == "CONFLICT" else status.HTTP_500_INTERNAL_SERVER_ERROR,
+        status_code=status.HTTP_409_CONFLICT
+        if error_code == "CONFLICT"
+        else status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=response_data,
     )
 
@@ -266,4 +267,3 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=response_data,
     )
-

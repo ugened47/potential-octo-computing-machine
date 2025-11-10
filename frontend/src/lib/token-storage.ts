@@ -1,44 +1,39 @@
-/** Token storage utilities. */
+// Token storage management
+const ACCESS_TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
 
-const TOKEN_KEY = "auth_token";
+class TokenStorage {
+  setTokens(accessToken: string, refreshToken: string): void {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    }
+  }
 
-/**
- * Get authentication token from localStorage.
- */
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
+  getAccessToken(): string | null {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(ACCESS_TOKEN_KEY);
+    }
+    return null;
+  }
 
-/**
- * Set authentication token in localStorage.
- */
-export function setToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
-}
+  getRefreshToken(): string | null {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(REFRESH_TOKEN_KEY);
+    }
+    return null;
+  }
 
-/**
- * Remove authentication token from localStorage.
- */
-export function removeToken(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(TOKEN_KEY);
-}
+  clear(): void {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(REFRESH_TOKEN_KEY);
+    }
+  }
 
-/**
- * Check if a valid token exists.
- */
-export function hasValidToken(): boolean {
-  const token = getToken();
-  if (!token) return false;
-
-  try {
-    // Decode JWT token and check expiration
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    const exp = payload.exp * 1000; // Convert to milliseconds
-    return Date.now() < exp;
-  } catch {
-    return false;
+  hasValidToken(): boolean {
+    return !!this.getAccessToken();
   }
 }
+
+export const tokenStorage = new TokenStorage();
