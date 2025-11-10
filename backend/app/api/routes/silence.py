@@ -50,9 +50,7 @@ async def detect_silence_segments(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -107,9 +105,7 @@ async def remove_silence(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -163,9 +159,7 @@ async def get_silence_removal_progress(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -190,9 +184,6 @@ async def get_silence_removal_progress(
                 estimated_time_remaining=data.get("estimated_time_remaining"),
             )
         else:
-            return SilenceRemovalProgress(
-                video_id=str(video_id), progress=0, status="Not started"
-            )
+            return SilenceRemovalProgress(video_id=str(video_id), progress=0, status="Not started")
     finally:
         await redis_client.aclose()
-

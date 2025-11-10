@@ -1,17 +1,20 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { Progress } from '@/components/ui/progress'
-import { Button } from '@/components/ui/button'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { AlertCircle, RefreshCw } from 'lucide-react'
-import type { TranscriptProgress as TranscriptProgressType } from '@/types/transcript'
-import { getTranscriptionProgress, triggerTranscription } from '@/lib/transcript-api'
+import { useEffect, useState } from "react";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import type { TranscriptProgress as TranscriptProgressType } from "@/types/transcript";
+import {
+  getTranscriptionProgress,
+  triggerTranscription,
+} from "@/lib/transcript-api";
 
 interface TranscriptionProgressProps {
-  videoId: string
-  onComplete?: () => void
-  pollInterval?: number
+  videoId: string;
+  onComplete?: () => void;
+  pollInterval?: number;
 }
 
 export function TranscriptionProgress({
@@ -19,67 +22,74 @@ export function TranscriptionProgress({
   onComplete,
   pollInterval = 2000,
 }: TranscriptionProgressProps) {
-  const [progress, setProgress] = useState<TranscriptProgressType | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isPolling, setIsPolling] = useState(true)
+  const [progress, setProgress] = useState<TranscriptProgressType | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(true);
 
   useEffect(() => {
-    if (!isPolling) return
+    if (!isPolling) return;
 
-    let intervalId: NodeJS.Timeout
+    let intervalId: NodeJS.Timeout;
 
     const fetchProgress = async () => {
       try {
-        const data = await getTranscriptionProgress(videoId)
-        setProgress(data)
-        setError(null)
+        const data = await getTranscriptionProgress(videoId);
+        setProgress(data);
+        setError(null);
 
         // Stop polling if completed or failed
-        if (data.progress === 100 || data.status.toLowerCase().includes('failed')) {
-          setIsPolling(false)
+        if (
+          data.progress === 100 ||
+          data.status.toLowerCase().includes("failed")
+        ) {
+          setIsPolling(false);
           if (data.progress === 100 && onComplete) {
-            onComplete()
+            onComplete();
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch progress')
-        setIsPolling(false)
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch progress",
+        );
+        setIsPolling(false);
       }
-    }
+    };
 
     // Initial fetch
-    fetchProgress()
+    fetchProgress();
 
     // Set up polling
-    intervalId = setInterval(fetchProgress, pollInterval)
+    intervalId = setInterval(fetchProgress, pollInterval);
 
     return () => {
       if (intervalId) {
-        clearInterval(intervalId)
+        clearInterval(intervalId);
       }
-    }
-  }, [videoId, pollInterval, isPolling, onComplete])
+    };
+  }, [videoId, pollInterval, isPolling, onComplete]);
 
   const handleRetry = async () => {
     try {
-      setError(null)
-      setIsPolling(true)
-      await triggerTranscription(videoId)
+      setError(null);
+      setIsPolling(true);
+      await triggerTranscription(videoId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to trigger transcription')
+      setError(
+        err instanceof Error ? err.message : "Failed to trigger transcription",
+      );
     }
-  }
+  };
 
   if (!progress) {
     return (
       <div className="flex items-center justify-center p-4">
         <LoadingSpinner />
       </div>
-    )
+    );
   }
 
-  const isFailed = progress.status.toLowerCase().includes('failed')
-  const isCompleted = progress.progress === 100
+  const isFailed = progress.status.toLowerCase().includes("failed");
+  const isCompleted = progress.progress === 100;
 
   return (
     <div className="space-y-4 p-4">
@@ -95,7 +105,7 @@ export function TranscriptionProgress({
       {/* Estimated time remaining */}
       {progress.estimated_time_remaining && !isCompleted && (
         <div className="text-sm text-muted-foreground">
-          Estimated time remaining:{' '}
+          Estimated time remaining:{" "}
           {Math.ceil(progress.estimated_time_remaining / 60)} minutes
         </div>
       )}
@@ -129,6 +139,5 @@ export function TranscriptionProgress({
         </div>
       )}
     </div>
-  )
+  );
 }
-

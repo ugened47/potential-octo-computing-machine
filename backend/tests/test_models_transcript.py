@@ -1,8 +1,8 @@
 """Tests for Transcript model."""
 
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
 from app.models.transcript import Transcript, TranscriptStatus
 from app.models.user import User
@@ -179,4 +179,3 @@ async def test_transcript_video_relationship(db_session: AsyncSession):
 
     # Verify foreign key relationship
     assert transcript.video_id == video.id
-

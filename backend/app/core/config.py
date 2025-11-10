@@ -1,6 +1,5 @@
 """Application configuration."""
 
-from typing import List
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,14 +14,10 @@ class Settings(BaseSettings):
     app_name: str = "AI Video Editor"
     environment: str = Field(default="development")
     debug: bool = Field(default=True)
-    allowed_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8000"]
-    )
+    allowed_origins: list[str] = Field(default=["http://localhost:3000", "http://localhost:8000"])
 
     # Database
-    database_url: str = Field(
-        default="postgresql://postgres:postgres@localhost:5432/videodb"
-    )
+    database_url: str = Field(default="postgresql://postgres:postgres@localhost:5432/videodb")
 
     # Redis
     redis_url: str = Field(default="redis://localhost:6379/0")
@@ -41,11 +36,11 @@ class Settings(BaseSettings):
     s3_bucket: str = Field(default="video-editor-uploads")
     cloudfront_domain: str = Field(default="")
     minio_endpoint_url: str = Field(default="http://minio:9000")
-    
+
     @property
     def s3_endpoint_url(self) -> str | None:
         """Get S3 endpoint URL based on environment.
-        
+
         Returns:
             MinIO endpoint URL for development, None for production (uses AWS S3)
         """
@@ -58,9 +53,7 @@ class Settings(BaseSettings):
 
     # File Upload
     max_upload_size_mb: int = Field(default=2048)  # 2GB
-    allowed_video_formats: List[str] = Field(
-        default=["mp4", "mov", "avi", "webm", "mkv"]
-    )
+    allowed_video_formats: list[str] = Field(default=["mp4", "mov", "avi", "webm", "mkv"])
 
     # Processing
     default_silence_threshold_db: int = Field(default=-40)

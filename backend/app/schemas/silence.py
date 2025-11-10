@@ -1,6 +1,5 @@
 """Silence removal API schemas."""
 
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -8,13 +7,11 @@ from pydantic import BaseModel, Field
 class SilenceRemovalRequest(BaseModel):
     """Silence removal request schema."""
 
-    threshold_db: int = Field(
-        default=-40, ge=-60, le=-20, description="Silence threshold in dB"
-    )
+    threshold_db: int = Field(default=-40, ge=-60, le=-20, description="Silence threshold in dB")
     min_duration_ms: int = Field(
         default=1000, ge=500, le=5000, description="Minimum silence duration in milliseconds"
     )
-    excluded_segments: Optional[list[int]] = Field(
+    excluded_segments: list[int] | None = Field(
         default=None, description="List of segment indices to exclude from removal"
     )
 
@@ -42,7 +39,4 @@ class SilenceRemovalProgress(BaseModel):
     video_id: str
     progress: int = Field(..., ge=0, le=100, description="Progress percentage (0-100)")
     status: str = Field(..., description="Current status message")
-    estimated_time_remaining: Optional[int] = Field(
-        None, description="Estimated seconds remaining"
-    )
-
+    estimated_time_remaining: int | None = Field(None, description="Estimated seconds remaining")

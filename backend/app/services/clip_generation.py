@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from typing import Callable, Optional
+from collections.abc import Callable
 from uuid import UUID
 
 import av
@@ -76,11 +76,7 @@ class ClipGenerationService:
 
         # Copy streams to output
         video_out = output_container.add_stream(template=video_stream)
-        audio_out = (
-            output_container.add_stream(template=audio_stream)
-            if audio_stream
-            else None
-        )
+        audio_out = output_container.add_stream(template=audio_stream) if audio_stream else None
 
         # Seek to start time
         input_container.seek(int(start_time * av.time_base))
@@ -128,7 +124,7 @@ class ClipGenerationService:
     async def generate_clip(
         self,
         clip_id: UUID,
-        update_progress: Optional[Callable[[int], None]] = None,
+        update_progress: Callable[[int], None] | None = None,
     ) -> Clip:
         """Generate a video clip.
 
@@ -176,9 +172,7 @@ class ClipGenerationService:
                 clip_path = clip_file.name
 
             try:
-                self.extract_clip(
-                    video_path, clip_path, clip.start_time, clip.end_time
-                )
+                self.extract_clip(video_path, clip_path, clip.start_time, clip.end_time)
 
                 # Update progress: Uploading
                 if update_progress:
@@ -223,4 +217,3 @@ class ClipGenerationService:
         finally:
             if os.path.exists(video_path):
                 os.unlink(video_path)
-

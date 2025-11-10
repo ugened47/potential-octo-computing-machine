@@ -1,17 +1,17 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
+import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 interface OnboardingState {
-  isCompleted: boolean
-  currentStep: number
-  completedSteps: number[]
-  skipOnboarding: () => void
-  completeStep: (step: number) => void
-  setCurrentStep: (step: number) => void
-  reset: () => void
+  isCompleted: boolean;
+  currentStep: number;
+  completedSteps: number[];
+  skipOnboarding: () => void;
+  completeStep: (step: number) => void;
+  setCurrentStep: (step: number) => void;
+  reset: () => void;
 }
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 4;
 
 export const useOnboarding = create<OnboardingState>()(
   persist(
@@ -24,13 +24,15 @@ export const useOnboarding = create<OnboardingState>()(
         set((state) => {
           const newCompletedSteps = state.completedSteps.includes(step)
             ? state.completedSteps
-            : [...state.completedSteps, step]
-          const isCompleted = newCompletedSteps.length === TOTAL_STEPS
+            : [...state.completedSteps, step];
+          const isCompleted = newCompletedSteps.length === TOTAL_STEPS;
           return {
             completedSteps: newCompletedSteps,
             isCompleted,
-            currentStep: isCompleted ? state.currentStep : state.currentStep + 1,
-          }
+            currentStep: isCompleted
+              ? state.currentStep
+              : state.currentStep + 1,
+          };
         }),
       setCurrentStep: (step: number) => set({ currentStep: step }),
       reset: () =>
@@ -41,9 +43,8 @@ export const useOnboarding = create<OnboardingState>()(
         }),
     }),
     {
-      name: 'onboarding-storage',
+      name: "onboarding-storage",
       storage: createJSONStorage(() => localStorage),
-    }
-  )
-)
-
+    },
+  ),
+);

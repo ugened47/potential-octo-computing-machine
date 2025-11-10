@@ -1,4 +1,3 @@
 /** Video status enum. */
 
-export type VideoStatus = 'uploaded' | 'processing' | 'completed' | 'failed'
-
+export type VideoStatus = "uploaded" | "processing" | "completed" | "failed";

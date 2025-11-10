@@ -1,7 +1,6 @@
 """Video schemas for request/response validation."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -29,15 +28,15 @@ class VideoCreate(BaseModel):
 
     video_id: UUID = Field(..., description="Video ID from presigned URL response")
     title: str = Field(..., max_length=255, description="Video title")
-    description: Optional[str] = Field(None, description="Video description")
+    description: str | None = Field(None, description="Video description")
     s3_key: str = Field(..., description="S3 key where the file was uploaded")
 
 
 class VideoUpdate(BaseModel):
     """Request schema for updating video metadata."""
 
-    title: Optional[str] = Field(None, max_length=255, description="Video title")
-    description: Optional[str] = Field(None, description="Video description")
+    title: str | None = Field(None, max_length=255, description="Video title")
+    description: str | None = Field(None, description="Video description")
 
 
 # Response schemas
@@ -47,14 +46,14 @@ class VideoRead(BaseModel):
     id: UUID
     user_id: UUID
     title: str
-    description: Optional[str]
-    file_size: Optional[int]
-    format: Optional[str]
-    duration: Optional[float]
-    resolution: Optional[str]
-    s3_key: Optional[str]
-    cloudfront_url: Optional[str]
-    thumbnail_url: Optional[str]
+    description: str | None
+    file_size: int | None
+    format: str | None
+    duration: float | None
+    resolution: str | None
+    s3_key: str | None
+    cloudfront_url: str | None
+    thumbnail_url: str | None
     status: str
     created_at: datetime
     updated_at: datetime
@@ -63,4 +62,3 @@ class VideoRead(BaseModel):
         """Pydantic config."""
 
         from_attributes = True
-

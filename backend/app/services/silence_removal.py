@@ -2,7 +2,8 @@
 
 import os
 import tempfile
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 from uuid import UUID
 
 import av
@@ -177,7 +178,7 @@ class SilenceRemovalService:
         video_path: str,
         output_path: str,
         silent_segments: list[dict[str, Any]],
-        excluded_segments: Optional[list[int]] = None,
+        excluded_segments: list[int] | None = None,
     ) -> None:
         """Remove silent segments from video using FFmpeg.
 
@@ -192,9 +193,7 @@ class SilenceRemovalService:
 
         # Filter out excluded segments
         segments_to_remove = [
-            seg
-            for i, seg in enumerate(silent_segments)
-            if i not in excluded_segments
+            seg for i, seg in enumerate(silent_segments) if i not in excluded_segments
         ]
 
         if not segments_to_remove:
@@ -233,9 +232,7 @@ class SilenceRemovalService:
 
         for seg in sorted(segments_to_remove, key=lambda x: x["start_time"]):
             if current_start < seg["start_time"]:
-                segments_to_keep.append(
-                    {"start": current_start, "end": seg["start_time"]}
-                )
+                segments_to_keep.append({"start": current_start, "end": seg["start_time"]})
             current_start = max(current_start, seg["end_time"])
 
         # Add final segment if there's remaining video
@@ -250,14 +247,8 @@ class SilenceRemovalService:
         output_container = av.open(output_path, mode="w")
 
         # Copy streams
-        video_out = output_container.add_stream(
-            template=video_stream
-        ) if video_stream else None
-        audio_out = (
-            output_container.add_stream(template=audio_stream)
-            if audio_stream
-            else None
-        )
+        video_out = output_container.add_stream(template=video_stream) if video_stream else None
+        audio_out = output_container.add_stream(template=audio_stream) if audio_stream else None
 
         # Process each segment
         for seg in segments_to_keep:
@@ -346,9 +337,7 @@ class SilenceRemovalService:
                 self.extract_audio_from_video(video_path, audio_path)
 
                 # Detect silence
-                segments = self.detect_silence_segments(
-                    audio_path, threshold_db, min_duration_ms
-                )
+                segments = self.detect_silence_segments(audio_path, threshold_db, min_duration_ms)
 
                 return segments
 
@@ -365,8 +354,8 @@ class SilenceRemovalService:
         video_id: UUID,
         threshold_db: int = -40,
         min_duration_ms: int = 1000,
-        excluded_segments: Optional[list[int]] = None,
-        update_progress: Optional[Callable[[int], None]] = None,
+        excluded_segments: list[int] | None = None,
+        update_progress: Callable[[int], None] | None = None,
     ) -> Video:
         """Remove silent segments from a video.
 
@@ -420,9 +409,7 @@ class SilenceRemovalService:
                     update_progress(40)
 
                 # Remove silence from video
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".mp4"
-                ) as output_file:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as output_file:
                     output_path = output_file.name
 
                 try:
@@ -436,7 +423,9 @@ class SilenceRemovalService:
 
                     # Store original video S3 key for undo capability
                     original_s3_key = video.s3_key
-                    original_s3_key_backup = f"originals/{video.user_id}/{video.id}/{os.path.basename(original_s3_key)}"
+                    original_s3_key_backup = (
+                        f"originals/{video.user_id}/{video.id}/{os.path.basename(original_s3_key)}"
+                    )
 
                     # Upload original to backup location if not already there
                     try:
@@ -494,4 +483,3 @@ class SilenceRemovalService:
         finally:
             if os.path.exists(video_path):
                 os.unlink(video_path)
-
