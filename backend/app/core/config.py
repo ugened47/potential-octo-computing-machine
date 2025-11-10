@@ -51,6 +51,20 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str = Field(default="")
 
+    # Transcription Optimization
+    transcription_convert_to_mono: bool = Field(
+        default=True, description="Convert audio to mono for cost savings (50% reduction)"
+    )
+    transcription_max_retries: int = Field(
+        default=3, description="Max retries for Whisper API calls"
+    )
+    transcription_retry_delay_seconds: int = Field(
+        default=2, description="Initial retry delay (exponential backoff)"
+    )
+    transcription_chunk_size_mb: int = Field(
+        default=24, description="Max chunk size for audio files (Whisper limit is 25MB)"
+    )
+
     # File Upload
     max_upload_size_mb: int = Field(default=2048)  # 2GB
     allowed_video_formats: list[str] = Field(default=["mp4", "mov", "avi", "webm", "mkv"])

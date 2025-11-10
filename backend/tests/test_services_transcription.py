@@ -208,3 +208,171 @@ async def test_transcribe_video_missing_s3_key(db_session: AsyncSession):
 
     with pytest.raises(ValueError, match="no S3 key"):
         await service.transcribe_video(video.id)
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_with_retry_success(db_session: AsyncSession):
+    """Test transcribe_audio_with_retry succeeds on first attempt."""
+    service = TranscriptionService(db_session)
+
+    mock_response = Mock()
+    mock_response.text = "Test transcription"
+    mock_response.language = "en"
+    mock_response.words = [
+        Mock(word="Test", start=0.0, end=0.5, probability=0.95),
+        Mock(word="transcription", start=0.5, end=1.5, probability=0.92),
+    ]
+
+    with patch.object(
+        service.openai_client.audio.transcriptions, "create", return_value=mock_response
+    ):
+        with patch("builtins.open", create=True):
+            result = await service.transcribe_audio_with_retry("/fake/path.mp3")
+
+    assert result["text"] == "Test transcription"
+    assert result["language"] == "en"
+    assert len(result["word_timestamps"]["words"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_with_retry_failure_then_success(db_session: AsyncSession):
+    """Test transcribe_audio_with_retry succeeds after retry."""
+    from openai import APIError
+
+    service = TranscriptionService(db_session)
+
+    mock_response = Mock()
+    mock_response.text = "Test transcription"
+    mock_response.language = "en"
+    mock_response.words = [
+        Mock(word="Test", start=0.0, end=0.5, probability=0.95),
+    ]
+
+    # First call fails, second succeeds
+    with patch.object(
+        service.openai_client.audio.transcriptions,
+        "create",
+        side_effect=[
+            APIError("Rate limit exceeded"),
+            mock_response,
+        ],
+    ):
+        with patch("builtins.open", create=True):
+            with patch("asyncio.sleep", new_callable=AsyncMock):
+                result = await service.transcribe_audio_with_retry("/fake/path.mp3")
+
+    assert result["text"] == "Test transcription"
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_with_retry_max_retries_exceeded(db_session: AsyncSession):
+    """Test transcribe_audio_with_retry fails after max retries."""
+    from openai import APIError
+
+    service = TranscriptionService(db_session)
+
+    with patch.object(
+        service.openai_client.audio.transcriptions,
+        "create",
+        side_effect=APIError("Rate limit exceeded"),
+    ):
+        with patch("builtins.open", create=True):
+            with patch("asyncio.sleep", new_callable=AsyncMock):
+                with pytest.raises(APIError):
+                    await service.transcribe_audio_with_retry("/fake/path.mp3", max_retries=2)
+
+
+@pytest.mark.asyncio
+async def test_split_audio_into_chunks(db_session: AsyncSession):
+    """Test splitting audio into chunks."""
+    service = TranscriptionService(db_session)
+
+    # Mock PyAV container and stream
+    mock_container = Mock()
+    mock_stream = Mock()
+    mock_stream.time_base = 0.001  # 1ms time base
+
+    # Create mock frames with timestamps
+    mock_frames = []
+    for i in range(0, 1200, 100):  # 12 frames spanning 1200 seconds
+        frame = Mock()
+        frame.pts = i * 1000  # Convert to ms
+        frame.layout.nb_channels = 1
+        mock_frames.append(frame)
+
+    mock_container.streams.audio = [mock_stream]
+    mock_container.decode.return_value = iter(mock_frames)
+
+    with patch("av.open", return_value=mock_container):
+        with patch("tempfile.NamedTemporaryFile") as mock_tempfile:
+            mock_tempfile.return_value.__enter__.return_value.name = "/fake/chunk.mp3"
+
+            # Mock output containers
+            mock_output = Mock()
+            mock_output_stream = Mock()
+            mock_output_stream.encode.return_value = []
+            mock_output.add_stream.return_value = mock_output_stream
+
+            with patch("av.open", return_value=mock_output):
+                chunks = service._split_audio_into_chunks("/fake/audio.mp3", chunk_duration_seconds=600)
+
+    # Should create 2 chunks (0-600s, 600-1200s)
+    assert len(chunks) >= 2
+
+
+@pytest.mark.asyncio
+async def test_transcribe_audio_chunked(db_session: AsyncSession):
+    """Test transcribing audio file with chunking."""
+    service = TranscriptionService(db_session)
+
+    # Mock chunk paths
+    chunk_paths = ["/fake/chunk1.mp3", "/fake/chunk2.mp3"]
+
+    # Mock transcription results for each chunk
+    chunk1_result = {
+        "text": "First chunk",
+        "language": "en",
+        "word_timestamps": {
+            "words": [
+                {"word": "First", "start": 0.0, "end": 0.5, "confidence": 0.95},
+                {"word": "chunk", "start": 0.5, "end": 1.0, "confidence": 0.92},
+            ]
+        },
+    }
+
+    chunk2_result = {
+        "text": "Second chunk",
+        "language": "en",
+        "word_timestamps": {
+            "words": [
+                {"word": "Second", "start": 0.0, "end": 0.6, "confidence": 0.93},
+                {"word": "chunk", "start": 0.6, "end": 1.2, "confidence": 0.91},
+            ]
+        },
+    }
+
+    with patch.object(
+        service, "_split_audio_into_chunks", return_value=chunk_paths
+    ):
+        with patch.object(
+            service,
+            "transcribe_audio",
+            side_effect=[chunk1_result, chunk2_result],
+        ):
+            with patch("os.path.exists", return_value=True):
+                with patch("os.unlink"):
+                    result = await service._transcribe_audio_chunked("/fake/audio.mp3")
+
+    # Verify merged results
+    assert result["text"] == "First chunk Second chunk"
+    assert result["language"] == "en"
+    assert len(result["word_timestamps"]["words"]) == 4
+
+    # Verify timestamp offsets
+    words = result["word_timestamps"]["words"]
+    assert words[0]["word"] == "First"
+    assert words[0]["start"] == 0.0
+    assert words[2]["word"] == "Second"
+    # Second chunk should be offset by last word end time from first chunk (1.0)
+    assert words[2]["start"] == 1.0
+    assert words[3]["start"] == 1.6  # 0.6 + 1.0 offset
