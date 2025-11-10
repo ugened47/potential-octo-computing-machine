@@ -1,6 +1,5 @@
 """Timeline schemas for waveform and segments."""
 
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,7 +16,7 @@ class WaveformStatus(BaseModel):
     """Waveform generation status schema."""
 
     status: str = Field(..., description="Status: processing, completed, or failed")
-    progress: Optional[int] = Field(
+    progress: int | None = Field(
         default=None, ge=0, le=100, description="Progress percentage (0-100)"
     )
 
@@ -38,4 +37,3 @@ class SegmentCreate(BaseModel):
     start_time: float = Field(..., ge=0, description="Start time in seconds")
     end_time: float = Field(..., ge=0, description="End time in seconds")
     selected: bool = Field(default=True, description="Whether segment is selected")
-

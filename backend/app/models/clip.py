@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy import ARRAY, Column, String
@@ -30,7 +30,7 @@ class Clip(SQLModel, table=True):
 
     # Clip metadata
     title: str = Field(max_length=255)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    description: str | None = Field(default=None, max_length=1000)
     keywords: list[str] = Field(
         default_factory=list,
         sa_column=Column(ARRAY(String), nullable=False),
@@ -39,12 +39,10 @@ class Clip(SQLModel, table=True):
     # Clip timing
     start_time: float = Field(..., description="Start time in seconds")
     end_time: float = Field(..., description="End time in seconds")
-    duration: Optional[float] = Field(
-        default=None, description="Duration in seconds"
-    )
+    duration: float | None = Field(default=None, description="Duration in seconds")
 
     # Storage
-    clip_url: Optional[str] = Field(
+    clip_url: str | None = Field(
         default=None, max_length=500, description="S3 key or URL for clip"
     )
     status: ClipStatus = Field(default=ClipStatus.PROCESSING)
@@ -55,4 +53,3 @@ class Clip(SQLModel, table=True):
 
     # Relationships
     video: Optional["Video"] = Relationship()
-

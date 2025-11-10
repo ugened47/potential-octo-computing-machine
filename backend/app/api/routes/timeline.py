@@ -42,9 +42,7 @@ async def get_waveform(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -88,9 +86,7 @@ async def generate_waveform(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -113,7 +109,7 @@ async def generate_waveform(
         try:
             waveform_data = await waveform_service.generate_waveform(video_id)
             return WaveformStatus(status="completed", progress=100)
-        except Exception as e:
+        except Exception:
             return WaveformStatus(status="failed", progress=0)
 
 
@@ -138,9 +134,7 @@ async def get_waveform_status(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -182,9 +176,7 @@ async def save_segments(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -240,9 +232,7 @@ async def get_segments(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -276,9 +266,7 @@ async def delete_segments(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -288,4 +276,3 @@ async def delete_segments(
 
     # For MVP, just return success
     return {"message": "Segments cleared"}
-

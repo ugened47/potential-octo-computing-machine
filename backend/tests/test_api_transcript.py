@@ -1,9 +1,9 @@
 """Tests for transcript API endpoints."""
 
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
 from app.main import app
 from app.models.transcript import Transcript, TranscriptStatus
@@ -91,9 +91,7 @@ async def test_get_transcript_success(
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get(
-        f"/api/videos/{test_video.id}/transcript", headers=headers
-    )
+    response = client.get(f"/api/videos/{test_video.id}/transcript", headers=headers)
 
     assert response.status_code == 200
     data = response.json()
@@ -105,18 +103,14 @@ async def test_get_transcript_success(
 
 
 @pytest.mark.asyncio
-async def test_get_transcript_not_found(
-    client: TestClient, test_user: User, test_video: Video
-):
+async def test_get_transcript_not_found(client: TestClient, test_user: User, test_video: Video):
     """Test getting transcript when it doesn't exist."""
     from app.core.security import create_access_token
 
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get(
-        f"/api/videos/{test_video.id}/transcript", headers=headers
-    )
+    response = client.get(f"/api/videos/{test_video.id}/transcript", headers=headers)
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
@@ -151,9 +145,7 @@ async def test_get_transcript_wrong_user(
     token = create_access_token({"sub": str(other_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get(
-        f"/api/videos/{test_video.id}/transcript", headers=headers
-    )
+    response = client.get(f"/api/videos/{test_video.id}/transcript", headers=headers)
 
     assert response.status_code == 403
     assert "not authorized" in response.json()["detail"].lower()
@@ -164,17 +156,15 @@ async def test_trigger_transcription_success(
     client: TestClient, test_user: User, test_video: Video
 ):
     """Test triggering transcription successfully."""
+
     from app.core.security import create_access_token
-    from unittest.mock import patch, AsyncMock
 
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
     # Test that the endpoint accepts the request and returns 202
     # The actual enqueueing may fail in test environment, but endpoint should still return 202
-    response = client.post(
-        f"/api/videos/{test_video.id}/transcript/transcribe", headers=headers
-    )
+    response = client.post(f"/api/videos/{test_video.id}/transcript/transcribe", headers=headers)
 
     # Endpoint should return 202 (accepted) even if enqueue fails
     assert response.status_code == 202
@@ -206,9 +196,7 @@ async def test_trigger_transcription_already_processing(
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.post(
-        f"/api/videos/{test_video.id}/transcript/transcribe", headers=headers
-    )
+    response = client.post(f"/api/videos/{test_video.id}/transcript/transcribe", headers=headers)
 
     assert response.status_code == 409
     assert "already in progress" in response.json()["detail"].lower()
@@ -284,9 +272,7 @@ async def test_get_transcription_progress_not_started(
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get(
-        f"/api/videos/{test_video.id}/transcript/progress", headers=headers
-    )
+    response = client.get(f"/api/videos/{test_video.id}/transcript/progress", headers=headers)
 
     assert response.status_code == 200
     data = response.json()
@@ -305,13 +291,10 @@ async def test_get_transcription_progress_completed(
     token = create_access_token({"sub": str(test_user.id)})
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = client.get(
-        f"/api/videos/{test_video.id}/transcript/progress", headers=headers
-    )
+    response = client.get(f"/api/videos/{test_video.id}/transcript/progress", headers=headers)
 
     assert response.status_code == 200
     data = response.json()
     assert data["video_id"] == str(test_video.id)
     assert data["progress"] == 100
     assert data["status"] == "Completed"
-

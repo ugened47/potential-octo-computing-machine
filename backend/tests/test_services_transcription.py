@@ -1,9 +1,8 @@
 """Tests for transcription service."""
 
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
-from unittest.mock import Mock, patch, AsyncMock
 
 from app.models.transcript import Transcript, TranscriptStatus
 from app.models.user import User
@@ -109,11 +108,7 @@ async def test_update_transcript(db_session: AsyncSession):
     await db_session.commit()
     await db_session.refresh(transcript)
 
-    word_timestamps = {
-        "words": [
-            {"word": "Hello", "start": 0.0, "end": 0.5, "confidence": 0.95}
-        ]
-    }
+    word_timestamps = {"words": [{"word": "Hello", "start": 0.0, "end": 0.5, "confidence": 0.95}]}
 
     service = TranscriptionService(db_session)
     updated = await service.update_transcript(
@@ -204,9 +199,7 @@ async def test_transcribe_video_missing_s3_key(db_session: AsyncSession):
     await db_session.commit()
     await db_session.refresh(user)
 
-    video = Video(
-        user_id=user.id, title="Test", status=VideoStatus.UPLOADED, s3_key=None
-    )
+    video = Video(user_id=user.id, title="Test", status=VideoStatus.UPLOADED, s3_key=None)
     db_session.add(video)
     await db_session.commit()
     await db_session.refresh(video)
@@ -383,4 +376,3 @@ async def test_transcribe_audio_chunked(db_session: AsyncSession):
     # Second chunk should be offset by last word end time from first chunk (1.0)
     assert words[2]["start"] == 1.0
     assert words[3]["start"] == 1.6  # 0.6 + 1.0 offset
-

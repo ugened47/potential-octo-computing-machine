@@ -1,7 +1,6 @@
 """Tests for video metadata extraction service."""
 
 from unittest.mock import Mock, patch
-from uuid import uuid4
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +38,7 @@ async def test_extract_metadata_extracts_duration_resolution_format(
         mock_container.__enter__ = Mock(return_value=mock_container)
         mock_container.__exit__ = Mock(return_value=None)
         mock_open.return_value = mock_container
-        
+
         # Mock video stream
         mock_stream = Mock()
         mock_stream.width = 1920
@@ -49,12 +48,12 @@ async def test_extract_metadata_extracts_duration_resolution_format(
         mock_stream.codec = mock_codec
         mock_stream.duration = None
         mock_stream.time_base = None
-        
+
         # Mock streams
         mock_streams = Mock()
         mock_streams.video = [mock_stream]
         mock_container.streams = mock_streams
-        
+
         # Mock container properties
         mock_container.duration = 120500000  # microseconds (120.5 seconds)
         mock_format = Mock()
@@ -86,9 +85,10 @@ async def test_extract_video_metadata_updates_video_status_flow(
     service = VideoMetadataService(db_session)
 
     # Mock S3 download and metadata extraction
-    with patch.object(service, "download_video_from_s3"), \
-         patch.object(service, "extract_metadata") as mock_extract:
-        
+    with (
+        patch.object(service, "download_video_from_s3"),
+        patch.object(service, "extract_metadata") as mock_extract,
+    ):
         mock_extract.return_value = {
             "duration": 60.0,
             "resolution": "1280x720",
@@ -106,9 +106,7 @@ async def test_extract_video_metadata_updates_video_status_flow(
 
 
 @pytest.mark.asyncio
-async def test_extract_video_metadata_error_handling(
-    db_session: AsyncSession, test_user: User
-):
+async def test_extract_video_metadata_error_handling(db_session: AsyncSession, test_user: User):
     """Test error handling in extract_video_metadata."""
     video = Video(
         user_id=test_user.id,
@@ -132,9 +130,7 @@ async def test_extract_video_metadata_error_handling(
 
 
 @pytest.mark.asyncio
-async def test_extract_video_metadata_progress_callback(
-    db_session: AsyncSession, test_user: User
-):
+async def test_extract_video_metadata_progress_callback(db_session: AsyncSession, test_user: User):
     """Test progress callback is called during metadata extraction."""
     video = Video(
         user_id=test_user.id,
@@ -153,9 +149,10 @@ async def test_extract_video_metadata_progress_callback(
         progress_updates.append(progress)
 
     # Mock S3 download and metadata extraction
-    with patch.object(service, "download_video_from_s3"), \
-         patch.object(service, "extract_metadata") as mock_extract:
-        
+    with (
+        patch.object(service, "download_video_from_s3"),
+        patch.object(service, "extract_metadata") as mock_extract,
+    ):
         mock_extract.return_value = {
             "duration": 60.0,
             "resolution": "1280x720",
@@ -167,4 +164,3 @@ async def test_extract_video_metadata_progress_callback(
         # Verify progress was updated
         assert len(progress_updates) > 0
         assert 100 in progress_updates  # Should reach 100%
-

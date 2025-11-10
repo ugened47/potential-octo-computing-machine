@@ -1,6 +1,6 @@
 """Custom exception classes for the application."""
 
-from typing import Any, Optional
+from typing import Any
 
 
 class AppException(Exception):
@@ -9,9 +9,9 @@ class AppException(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
+        error_code: str | None = None,
         status_code: int = 500,
-        details: Optional[dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
     ):
         """Initialize exception.
 
@@ -31,7 +31,7 @@ class AppException(Exception):
 class NotFoundError(AppException):
     """Resource not found error."""
 
-    def __init__(self, resource: str, resource_id: Optional[str] = None):
+    def __init__(self, resource: str, resource_id: str | None = None):
         """Initialize not found error.
 
         Args:
@@ -52,7 +52,9 @@ class NotFoundError(AppException):
 class ValidationError(AppException):
     """Validation error."""
 
-    def __init__(self, message: str, field: Optional[str] = None, details: Optional[dict[str, Any]] = None):
+    def __init__(
+        self, message: str, field: str | None = None, details: dict[str, Any] | None = None
+    ):
         """Initialize validation error.
 
         Args:
@@ -106,7 +108,7 @@ class AuthorizationError(AppException):
 class ConflictError(AppException):
     """Resource conflict error."""
 
-    def __init__(self, message: str, resource: Optional[str] = None):
+    def __init__(self, message: str, resource: str | None = None):
         """Initialize conflict error.
 
         Args:
@@ -127,7 +129,7 @@ class ConflictError(AppException):
 class RateLimitError(AppException):
     """Rate limit exceeded error."""
 
-    def __init__(self, message: str = "Rate limit exceeded", retry_after: Optional[int] = None):
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: int | None = None):
         """Initialize rate limit error.
 
         Args:
@@ -148,7 +150,7 @@ class RateLimitError(AppException):
 class ProcessingError(AppException):
     """Video processing error."""
 
-    def __init__(self, message: str, video_id: Optional[str] = None):
+    def __init__(self, message: str, video_id: str | None = None):
         """Initialize processing error.
 
         Args:
@@ -182,4 +184,3 @@ class ExternalServiceError(AppException):
             status_code=502,
             details={"service": service},
         )
-

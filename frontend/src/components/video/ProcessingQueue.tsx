@@ -1,47 +1,47 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { RefreshCw, ExternalLink } from 'lucide-react'
-import { getVideos } from '@/lib/video-api'
-import type { Video } from '@/types/video'
-import { formatRelativeTime } from '@/lib/utils'
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { RefreshCw, ExternalLink } from "lucide-react";
+import { getVideos } from "@/lib/video-api";
+import type { Video } from "@/types/video";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface ProcessingQueueProps {
-  pollInterval?: number
+  pollInterval?: number;
 }
 
 export function ProcessingQueue({ pollInterval = 5000 }: ProcessingQueueProps) {
-  const router = useRouter()
-  const [processingVideos, setProcessingVideos] = useState<Video[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter();
+  const [processingVideos, setProcessingVideos] = useState<Video[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchProcessingVideos = async () => {
     try {
-      const videos = await getVideos({ status: 'processing' })
-      setProcessingVideos(videos)
+      const videos = await getVideos({ status: "processing" });
+      setProcessingVideos(videos);
     } catch (error) {
-      console.error('Failed to fetch processing videos:', error)
+      console.error("Failed to fetch processing videos:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     // Initial fetch
-    fetchProcessingVideos()
+    fetchProcessingVideos();
 
     // Set up polling
-    const intervalId = setInterval(fetchProcessingVideos, pollInterval)
+    const intervalId = setInterval(fetchProcessingVideos, pollInterval);
 
     return () => {
-      clearInterval(intervalId)
-    }
-  }, [pollInterval])
+      clearInterval(intervalId);
+    };
+  }, [pollInterval]);
 
   if (isLoading) {
     return (
@@ -53,7 +53,7 @@ export function ProcessingQueue({ pollInterval = 5000 }: ProcessingQueueProps) {
           <div className="text-sm text-muted-foreground">Loading...</div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   if (processingVideos.length === 0) {
@@ -68,7 +68,7 @@ export function ProcessingQueue({ pollInterval = 5000 }: ProcessingQueueProps) {
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
@@ -116,6 +116,5 @@ export function ProcessingQueue({ pollInterval = 5000 }: ProcessingQueueProps) {
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
-

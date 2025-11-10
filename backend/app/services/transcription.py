@@ -1,12 +1,10 @@
 """Transcription service for OpenAI Whisper API integration."""
 
 import asyncio
-import io
-import json
 import os
 import tempfile
-import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 from uuid import UUID
 
 import av
@@ -38,7 +36,7 @@ class TranscriptionService:
             region_name=settings.aws_region,
         )
 
-    async def get_transcript(self, video_id: UUID) -> Optional[Transcript]:
+    async def get_transcript(self, video_id: UUID) -> Transcript | None:
         """Get transcript for a video.
 
         Args:
@@ -47,9 +45,7 @@ class TranscriptionService:
         Returns:
             Transcript if found, None otherwise
         """
-        result = await self.db.execute(
-            select(Transcript).where(Transcript.video_id == video_id)
-        )
+        result = await self.db.execute(select(Transcript).where(Transcript.video_id == video_id))
         return result.scalar_one_or_none()
 
     async def create_transcript_record(
@@ -80,8 +76,8 @@ class TranscriptionService:
         transcript_id: UUID,
         full_text: str,
         word_timestamps: dict[str, Any],
-        language: Optional[str] = None,
-        accuracy_score: Optional[float] = None,
+        language: str | None = None,
+        accuracy_score: float | None = None,
         status: TranscriptStatus = TranscriptStatus.COMPLETED,
     ) -> Transcript:
         """Update transcript with transcription results.
@@ -99,9 +95,7 @@ class TranscriptionService:
         """
         from datetime import datetime
 
-        result = await self.db.execute(
-            select(Transcript).where(Transcript.id == transcript_id)
-        )
+        result = await self.db.execute(select(Transcript).where(Transcript.id == transcript_id))
         transcript = result.scalar_one_or_none()
 
         if not transcript:
@@ -190,8 +184,8 @@ class TranscriptionService:
     async def transcribe_audio_with_retry(
         self,
         audio_path: str,
-        language: Optional[str] = None,
-        max_retries: Optional[int] = None,
+        language: str | None = None,
+        max_retries: int | None = None,
     ) -> dict[str, Any]:
         """Transcribe audio file using OpenAI Whisper API with retry logic.
 
@@ -260,7 +254,7 @@ class TranscriptionService:
         raise last_error or Exception("Transcription failed for unknown reason")
 
     async def transcribe_audio(
-        self, audio_path: str, language: Optional[str] = None
+        self, audio_path: str, language: str | None = None
     ) -> dict[str, Any]:
         """Transcribe audio file using OpenAI Whisper API (backward compatible).
 
@@ -344,8 +338,8 @@ class TranscriptionService:
     async def _transcribe_audio_chunked(
         self,
         audio_path: str,
-        language: Optional[str] = None,
-        update_progress: Optional[Callable[[int], None]] = None,
+        language: str | None = None,
+        update_progress: Callable[[int], None] | None = None,
     ) -> dict[str, Any]:
         """Transcribe large audio file by splitting into chunks.
 
@@ -416,7 +410,7 @@ class TranscriptionService:
                     os.unlink(chunk_path)
 
     async def transcribe_video(
-        self, video_id: UUID, update_progress: Optional[Callable[[int], None]] = None
+        self, video_id: UUID, update_progress: Callable[[int], None] | None = None
     ) -> Transcript:
         """Transcribe a video (full workflow).
 
@@ -464,7 +458,9 @@ class TranscriptionService:
             try:
                 # Extract audio with mono conversion for cost optimization
                 self.extract_audio_from_video(
-                    video_path, audio_path, convert_to_mono=settings.transcription_convert_to_mono
+                    video_path,
+                    audio_path,
+                    convert_to_mono=settings.transcription_convert_to_mono,
                 )
 
                 # Check file size and handle chunking if needed
@@ -571,9 +567,7 @@ class TranscriptionService:
 
             text = " ".join(word["word"] for word in segment)
             srt_lines.append(f"{idx}")
-            srt_lines.append(
-                f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
-            )
+            srt_lines.append(f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}")
             srt_lines.append(text)
             srt_lines.append("")
 
@@ -626,11 +620,8 @@ class TranscriptionService:
                 return f"{hours:02d}:{minutes:02d}:{secs:02d}.{millis:03d}"
 
             text = " ".join(word["word"] for word in segment)
-            vtt_lines.append(
-                f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}"
-            )
+            vtt_lines.append(f"{format_timestamp(start_time)} --> {format_timestamp(end_time)}")
             vtt_lines.append(text)
             vtt_lines.append("")
 
         return "\n".join(vtt_lines)
-
