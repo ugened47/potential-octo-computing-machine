@@ -1,26 +1,32 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertCircle, RefreshCw, Home } from 'lucide-react'
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AlertCircle, RefreshCw, Home } from "lucide-react";
 
 export default function Error({
   error,
   reset,
 }: {
-  error: Error & { digest?: string }
-  reset: () => void
+  error: Error & { digest?: string };
+  reset: () => void;
 }) {
   useEffect(() => {
     // Log error to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Next.js error page:', error)
+    if (process.env.NODE_ENV === "development") {
+      console.error("Next.js error page:", error);
     }
 
     // TODO: Log to error reporting service (e.g., Sentry) in production
     // Sentry.captureException(error)
-  }, [error])
+  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -35,7 +41,7 @@ export default function Error({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {process.env.NODE_ENV === 'development' && (
+          {process.env.NODE_ENV === "development" && (
             <div className="rounded-md bg-muted p-3 text-sm">
               <div className="font-mono text-xs text-muted-foreground">
                 {error.message}
@@ -52,7 +58,10 @@ export default function Error({
               <RefreshCw className="mr-2 h-4 w-4" />
               Try Again
             </Button>
-            <Button onClick={() => (window.location.href = '/dashboard')} variant="outline">
+            <Button
+              onClick={() => (window.location.href = "/dashboard")}
+              variant="outline"
+            >
               <Home className="mr-2 h-4 w-4" />
               Go Home
             </Button>
@@ -60,6 +69,5 @@ export default function Error({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
-

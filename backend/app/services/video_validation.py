@@ -130,4 +130,3 @@ class VideoValidationService:
         VideoValidationService.validate_mime_type(content_type, extension)
 
         return extension
-

@@ -1,37 +1,40 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Download } from 'lucide-react'
-import { exportTranscript, downloadTranscript } from '@/lib/transcript-api'
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { exportTranscript, downloadTranscript } from "@/lib/transcript-api";
 
 interface TranscriptExportProps {
-  videoId: string
-  className?: string
+  videoId: string;
+  className?: string;
 }
 
-export function TranscriptExport({ videoId, className }: TranscriptExportProps) {
-  const [isExporting, setIsExporting] = useState(false)
+export function TranscriptExport({
+  videoId,
+  className,
+}: TranscriptExportProps) {
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = async (format: 'srt' | 'vtt') => {
+  const handleExport = async (format: "srt" | "vtt") => {
     try {
-      setIsExporting(true)
-      const blob = await exportTranscript(videoId, format)
-      const filename = `transcript_${videoId}.${format}`
-      downloadTranscript(blob, filename)
+      setIsExporting(true);
+      const blob = await exportTranscript(videoId, format);
+      const filename = `transcript_${videoId}.${format}`;
+      downloadTranscript(blob, filename);
     } catch (error) {
-      console.error(`Failed to export transcript as ${format}:`, error)
-      alert(`Failed to export transcript. Please try again.`)
+      console.error(`Failed to export transcript as ${format}:`, error);
+      alert(`Failed to export transcript. Please try again.`);
     } finally {
-      setIsExporting(false)
+      setIsExporting(false);
     }
-  }
+  };
 
   return (
     <div className={className}>
       <div className="flex gap-2">
         <Button
-          onClick={() => handleExport('srt')}
+          onClick={() => handleExport("srt")}
           disabled={isExporting}
           variant="outline"
           size="sm"
@@ -40,7 +43,7 @@ export function TranscriptExport({ videoId, className }: TranscriptExportProps) 
           Export SRT
         </Button>
         <Button
-          onClick={() => handleExport('vtt')}
+          onClick={() => handleExport("vtt")}
           disabled={isExporting}
           variant="outline"
           size="sm"
@@ -50,6 +53,5 @@ export function TranscriptExport({ videoId, className }: TranscriptExportProps) 
         </Button>
       </div>
     </div>
-  )
+  );
 }
-

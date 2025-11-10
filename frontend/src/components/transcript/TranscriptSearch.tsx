@@ -1,30 +1,30 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Input } from '@/components/ui/input'
-import { Search, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TranscriptSearchProps {
-  onSearchChange: (query: string) => void
-  placeholder?: string
+  onSearchChange: (query: string) => void;
+  placeholder?: string;
 }
 
 export function TranscriptSearch({
   onSearchChange,
-  placeholder = 'Search transcript...',
+  placeholder = "Search transcript...",
 }: TranscriptSearchProps) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState("");
 
   const handleChange = (value: string) => {
-    setQuery(value)
-    onSearchChange(value)
-  }
+    setQuery(value);
+    onSearchChange(value);
+  };
 
   const handleClear = () => {
-    setQuery('')
-    onSearchChange('')
-  }
+    setQuery("");
+    onSearchChange("");
+  };
 
   return (
     <div className="relative">
@@ -47,6 +47,5 @@ export function TranscriptSearch({
         </Button>
       )}
     </div>
-  )
+  );
 }
-

@@ -1,0 +1,231 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: videodb_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libavfilter-dev libswscale-dev libswresample-dev
+
+      - name: Install Python dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: Run linters
+        run: |
+          cd backend
+          ruff format --check .
+          ruff check .
+          mypy app
+
+      - name: Run unit tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/videodb_test
+          SECRET_KEY: test-secret-key-for-ci
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd backend
+          pytest tests/unit/ -v --cov=app --cov-report=xml --cov-report=term
+
+      - name: Run integration tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/videodb_test
+          SECRET_KEY: test-secret-key-for-ci
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd backend
+          pytest tests/integration/ -v --cov=app --cov-append --cov-report=xml --cov-report=term
+
+      - name: Run E2E tests
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/videodb_test
+          SECRET_KEY: test-secret-key-for-ci
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd backend
+          pytest tests/e2e/ -v --cov=app --cov-append --cov-report=xml --cov-report=term
+
+      - name: Check coverage threshold
+        run: |
+          cd backend
+          pytest --cov=app --cov-report=term --cov-fail-under=80
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage.xml
+          flags: backend
+          name: backend-coverage
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run linters
+        run: |
+          cd frontend
+          npm run lint
+          npx tsc --noEmit
+
+      - name: Run unit and component tests
+        run: |
+          cd frontend
+          npm test -- --coverage
+
+      - name: Check coverage threshold
+        run: |
+          cd frontend
+          npm test -- --coverage --coverage.thresholds.lines=70
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage
+
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          cd frontend
+          npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Start backend services
+        run: |
+          docker-compose up -d db redis
+
+      - name: Build and start application
+        run: |
+          cd frontend
+          npm run build
+          npm start &
+          sleep 5
+
+      - name: Run Playwright tests
+        run: |
+          cd frontend
+          npx playwright test --project=${{ matrix.browser }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload test videos
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-videos-${{ matrix.browser }}
+          path: frontend/test-results/
+          retention-days: 7
+
+  test-summary:
+    name: Test Summary
+    needs: [backend-tests, frontend-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Check test results
+        run: |
+          echo "Backend tests: ${{ needs.backend-tests.result }}"
+          echo "Frontend tests: ${{ needs.frontend-tests.result }}"
+          echo "E2E tests: ${{ needs.e2e-tests.result }}"
+
+      - name: Report status
+        if: needs.backend-tests.result != 'success' || needs.frontend-tests.result != 'success' || needs.e2e-tests.result != 'success'
+        run: exit 1

@@ -48,9 +48,7 @@ async def get_dashboard_stats(
 
     # Storage used (sum of file_size in GB)
     storage_result = await db.execute(
-        select(func.coalesce(func.sum(Video.file_size), 0)).where(
-            Video.user_id == current_user.id
-        )
+        select(func.coalesce(func.sum(Video.file_size), 0)).where(Video.user_id == current_user.id)
     )
     storage_bytes = storage_result.scalar() or 0
     storage_used_gb = storage_bytes / (1024 * 1024 * 1024)  # Convert to GB
@@ -86,4 +84,3 @@ async def get_dashboard_stats(
     await set_cache(cache_key, stats, ttl=CACHE_TTL)
 
     return stats
-

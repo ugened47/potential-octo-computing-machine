@@ -1,83 +1,83 @@
-'use client'
+"use client";
 
-import { useState, FormEvent } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { GoogleOAuthButton } from './GoogleOAuthButton'
-import { login } from '@/lib/auth-api'
-import { useAuth } from '@/store/auth-store'
-import { validateEmail } from '@/lib/validation'
-import { Loader2 } from 'lucide-react'
+import { useState, FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
+import { login } from "@/lib/auth-api";
+import { useAuth } from "@/store/auth-store";
+import { validateEmail } from "@/lib/validation";
+import { Loader2 } from "lucide-react";
 
 export function LoginForm() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { setUser } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [emailError, setEmailError] = useState('')
-  const [passwordError, setPasswordError] = useState('')
-  const [generalError, setGeneralError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { setUser } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const returnUrl = searchParams.get('returnUrl') || '/dashboard'
+  const returnUrl = searchParams.get("returnUrl") || "/dashboard";
 
   const handleEmailBlur = () => {
     if (!email) {
-      setEmailError('Email is required')
+      setEmailError("Email is required");
     } else if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
+      setEmailError("Please enter a valid email address");
     } else {
-      setEmailError('')
+      setEmailError("");
     }
-  }
+  };
 
   const handlePasswordBlur = () => {
     if (!password) {
-      setPasswordError('Password is required')
+      setPasswordError("Password is required");
     } else {
-      setPasswordError('')
+      setPasswordError("");
     }
-  }
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setGeneralError('')
+    e.preventDefault();
+    setGeneralError("");
 
     // Validate
-    let isValid = true
+    let isValid = true;
     if (!email) {
-      setEmailError('Email is required')
-      isValid = false
+      setEmailError("Email is required");
+      isValid = false;
     } else if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
-      isValid = false
+      setEmailError("Please enter a valid email address");
+      isValid = false;
     }
 
     if (!password) {
-      setPasswordError('Password is required')
-      isValid = false
+      setPasswordError("Password is required");
+      isValid = false;
     }
 
-    if (!isValid) return
+    if (!isValid) return;
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await login(email, password)
-      setUser(response.user)
-      router.push(returnUrl)
+      const response = await login(email, password);
+      setUser(response.user);
+      router.push(returnUrl);
     } catch (error: any) {
       if (error.response?.data?.detail) {
-        setGeneralError(error.response.data.detail)
+        setGeneralError(error.response.data.detail);
       } else {
-        setGeneralError('Login failed. Please try again.')
+        setGeneralError("Login failed. Please try again.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -99,11 +99,9 @@ export function LoginForm() {
           onBlur={handleEmailBlur}
           placeholder="you@example.com"
           disabled={isLoading}
-          className={emailError ? 'border-destructive' : ''}
+          className={emailError ? "border-destructive" : ""}
         />
-        {emailError && (
-          <p className="text-sm text-destructive">{emailError}</p>
-        )}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
       </div>
 
       <div className="space-y-2">
@@ -118,7 +116,7 @@ export function LoginForm() {
           onBlur={handlePasswordBlur}
           placeholder="Enter your password"
           disabled={isLoading}
-          className={passwordError ? 'border-destructive' : ''}
+          className={passwordError ? "border-destructive" : ""}
         />
         {passwordError && (
           <p className="text-sm text-destructive">{passwordError}</p>
@@ -141,7 +139,7 @@ export function LoginForm() {
             Logging in...
           </>
         ) : (
-          'Log in'
+          "Log in"
         )}
       </Button>
 
@@ -159,12 +157,11 @@ export function LoginForm() {
       <GoogleOAuthButton className="w-full" />
 
       <div className="text-center text-sm">
-        Don't have an account?{' '}
+        Don't have an account?{" "}
         <Link href="/register" className="text-primary hover:underline">
           Sign up
         </Link>
       </div>
     </form>
-  )
+  );
 }
-

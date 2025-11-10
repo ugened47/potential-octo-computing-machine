@@ -1,7 +1,7 @@
 """Main FastAPI application."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +12,6 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.core.cache import close_redis
 from app.core.config import settings
 from app.core.db import close_db, init_db
-from app.core.rate_limit import RateLimitMiddleware
 from app.core.error_handler import (
     app_exception_handler,
     general_exception_handler,
@@ -22,6 +21,7 @@ from app.core.error_handler import (
     validation_exception_handler,
 )
 from app.core.exceptions import AppException
+from app.core.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
