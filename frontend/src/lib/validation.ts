@@ -8,7 +8,7 @@
  * @returns True if valid, false otherwise
  */
 export function validateEmail(email: string): boolean {
-  if (!email || typeof email !== 'string') return false;
+  if (!email || typeof email !== "string") return false;
 
   // RFC 5322 simplified email regex
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -21,8 +21,8 @@ export function validateEmail(email: string): boolean {
  * @returns Error message or null if valid
  */
 export function getEmailError(email: string): string | null {
-  if (!email) return 'Email is required';
-  if (!validateEmail(email)) return 'Please enter a valid email address';
+  if (!email) return "Email is required";
+  if (!validateEmail(email)) return "Please enter a valid email address";
   return null;
 }
 
@@ -38,7 +38,7 @@ export function getEmailError(email: string): string | null {
  * @returns True if valid, false otherwise
  */
 export function validatePassword(password: string): boolean {
-  if (!password || typeof password !== 'string') return false;
+  if (!password || typeof password !== "string") return false;
   if (password.length < 8) return false;
 
   const hasUpperCase = /[A-Z]/.test(password);
@@ -55,18 +55,21 @@ export function validatePassword(password: string): boolean {
  * @returns Error message or null if valid
  */
 export function getPasswordError(password: string): string | null {
-  if (!password) return 'Password is required';
-  if (password.length < 8) return 'Password must be at least 8 characters';
+  if (!password) return "Password is required";
+  if (password.length < 8) return "Password must be at least 8 characters";
 
   const hasUpperCase = /[A-Z]/.test(password);
   const hasLowerCase = /[a-z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
 
-  if (!hasUpperCase) return 'Password must contain at least one uppercase letter';
-  if (!hasLowerCase) return 'Password must contain at least one lowercase letter';
-  if (!hasNumber) return 'Password must contain at least one number';
-  if (!hasSpecialChar) return 'Password must contain at least one special character';
+  if (!hasUpperCase)
+    return "Password must contain at least one uppercase letter";
+  if (!hasLowerCase)
+    return "Password must contain at least one lowercase letter";
+  if (!hasNumber) return "Password must contain at least one number";
+  if (!hasSpecialChar)
+    return "Password must contain at least one special character";
 
   return null;
 }
@@ -77,7 +80,10 @@ export function getPasswordError(password: string): string | null {
  * @param confirmPassword - Confirmation password
  * @returns True if matching, false otherwise
  */
-export function validatePasswordConfirm(password: string, confirmPassword: string): boolean {
+export function validatePasswordConfirm(
+  password: string,
+  confirmPassword: string,
+): boolean {
   return password === confirmPassword && password.length > 0;
 }
 
@@ -87,9 +93,13 @@ export function validatePasswordConfirm(password: string, confirmPassword: strin
  * @param confirmPassword - Confirmation password
  * @returns Error message or null if valid
  */
-export function getPasswordConfirmError(password: string, confirmPassword: string): string | null {
-  if (!confirmPassword) return 'Please confirm your password';
-  if (!validatePasswordConfirm(password, confirmPassword)) return 'Passwords do not match';
+export function getPasswordConfirmError(
+  password: string,
+  confirmPassword: string,
+): string | null {
+  if (!confirmPassword) return "Please confirm your password";
+  if (!validatePasswordConfirm(password, confirmPassword))
+    return "Passwords do not match";
   return null;
 }
 
@@ -97,17 +107,23 @@ export function getPasswordConfirmError(password: string, confirmPassword: strin
  * Supported video formats
  */
 export const SUPPORTED_VIDEO_FORMATS = [
-  'video/mp4',
-  'video/quicktime', // .mov
-  'video/x-msvideo', // .avi
-  'video/x-matroska', // .mkv
-  'video/webm',
+  "video/mp4",
+  "video/quicktime", // .mov
+  "video/x-msvideo", // .avi
+  "video/x-matroska", // .mkv
+  "video/webm",
 ];
 
 /**
  * Supported video file extensions
  */
-export const SUPPORTED_VIDEO_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm'];
+export const SUPPORTED_VIDEO_EXTENSIONS = [
+  ".mp4",
+  ".mov",
+  ".avi",
+  ".mkv",
+  ".webm",
+];
 
 /**
  * Maximum video file size (2GB)
@@ -136,14 +152,14 @@ export function validateVideoFormat(file: File): boolean {
  * @returns Error message or null if valid
  */
 export function getVideoFormatError(file: File | null): string | null {
-  if (!file) return 'Please select a video file';
+  if (!file) return "Please select a video file";
 
   if (!validateVideoFormat(file)) {
-    return `Unsupported video format. Please use: ${SUPPORTED_VIDEO_EXTENSIONS.join(', ')}`;
+    return `Unsupported video format. Please use: ${SUPPORTED_VIDEO_EXTENSIONS.join(", ")}`;
   }
 
   if (file.size > MAX_VIDEO_SIZE) {
-    return 'Video file size must be less than 2GB';
+    return "Video file size must be less than 2GB";
   }
 
   return null;
@@ -164,7 +180,7 @@ export function validateVideoSize(file: File): boolean {
  * @returns True if valid, false otherwise
  */
 export function validateVideoTitle(title: string): boolean {
-  if (!title || typeof title !== 'string') return false;
+  if (!title || typeof title !== "string") return false;
   const trimmed = title.trim();
   return trimmed.length >= 1 && trimmed.length <= 200;
 }
@@ -175,8 +191,9 @@ export function validateVideoTitle(title: string): boolean {
  * @returns Error message or null if valid
  */
 export function getVideoTitleError(title: string): string | null {
-  if (!title || title.trim().length === 0) return 'Video title is required';
-  if (title.trim().length > 200) return 'Video title must be less than 200 characters';
+  if (!title || title.trim().length === 0) return "Video title is required";
+  if (title.trim().length > 200)
+    return "Video title must be less than 200 characters";
   return null;
 }
 
@@ -197,7 +214,7 @@ export function validateVideoDescription(description: string): boolean {
  */
 export function getVideoDescriptionError(description: string): string | null {
   if (description && description.length > 2000) {
-    return 'Description must be less than 2000 characters';
+    return "Description must be less than 2000 characters";
   }
   return null;
 }
@@ -208,7 +225,7 @@ export function getVideoDescriptionError(description: string): string | null {
  * @returns True if valid, false otherwise
  */
 export function validateKeyword(keyword: string): boolean {
-  if (!keyword || typeof keyword !== 'string') return false;
+  if (!keyword || typeof keyword !== "string") return false;
   const trimmed = keyword.trim();
   return trimmed.length >= 1 && trimmed.length <= 100;
 }
@@ -219,8 +236,9 @@ export function validateKeyword(keyword: string): boolean {
  * @returns Error message or null if valid
  */
 export function getKeywordError(keyword: string): string | null {
-  if (!keyword || keyword.trim().length === 0) return 'Keyword is required';
-  if (keyword.trim().length > 100) return 'Keyword must be less than 100 characters';
+  if (!keyword || keyword.trim().length === 0) return "Keyword is required";
+  if (keyword.trim().length > 100)
+    return "Keyword must be less than 100 characters";
   return null;
 }
 
@@ -230,7 +248,7 @@ export function getKeywordError(keyword: string): string | null {
  * @returns True if valid, false otherwise
  */
 export function validateFullName(name: string): boolean {
-  if (!name || typeof name !== 'string') return false;
+  if (!name || typeof name !== "string") return false;
   const trimmed = name.trim();
   return trimmed.length >= 1 && trimmed.length <= 100;
 }
@@ -241,8 +259,8 @@ export function validateFullName(name: string): boolean {
  * @returns Error message or null if valid
  */
 export function getFullNameError(name: string): string | null {
-  if (!name || name.trim().length === 0) return 'Name is required';
-  if (name.trim().length > 100) return 'Name must be less than 100 characters';
+  if (!name || name.trim().length === 0) return "Name is required";
+  if (name.trim().length > 100) return "Name must be less than 100 characters";
   return null;
 }
 
@@ -252,7 +270,7 @@ export function getFullNameError(name: string): string | null {
  * @returns True if valid, false otherwise
  */
 export function validateUrl(url: string): boolean {
-  if (!url || typeof url !== 'string') return false;
+  if (!url || typeof url !== "string") return false;
 
   try {
     new URL(url);
@@ -268,7 +286,7 @@ export function validateUrl(url: string): boolean {
  * @returns Error message or null if valid
  */
 export function getUrlError(url: string): string | null {
-  if (!url) return 'URL is required';
-  if (!validateUrl(url)) return 'Please enter a valid URL';
+  if (!url) return "URL is required";
+  if (!validateUrl(url)) return "Please enter a valid URL";
   return null;
 }

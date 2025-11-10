@@ -57,7 +57,10 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
         setWaveformData(data);
       } catch (error: any) {
         // Waveform doesn't exist, try to generate it
-        if (error.message?.includes("404") || error.message?.includes("not found")) {
+        if (
+          error.message?.includes("404") ||
+          error.message?.includes("not found")
+        ) {
           try {
             setIsGeneratingWaveform(true);
             await timelineAPI.generateWaveform(video.id);
@@ -195,7 +198,7 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
     (time: number) => {
       setCurrentTime(Math.max(0, Math.min(time, duration)));
     },
-    [duration]
+    [duration],
   );
 
   const handleSeekBackward = useCallback((seconds: number) => {
@@ -206,7 +209,7 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
     (seconds: number) => {
       setCurrentTime((prev) => Math.min(duration, prev + seconds));
     },
-    [duration]
+    [duration],
   );
 
   const handleZoomIn = useCallback(() => {
@@ -224,8 +227,8 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
   const handleSegmentClick = useCallback((segmentId: string) => {
     setSegments((prev) =>
       prev.map((seg) =>
-        seg.id === segmentId ? { ...seg, selected: !seg.selected } : seg
-      )
+        seg.id === segmentId ? { ...seg, selected: !seg.selected } : seg,
+      ),
     );
   }, []);
 
@@ -234,12 +237,17 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
       setSegments((prev) =>
         prev.map((seg) =>
           seg.id === segmentId
-            ? { ...seg, start: startTime, end: endTime, duration: endTime - startTime }
-            : seg
-        )
+            ? {
+                ...seg,
+                start: startTime,
+                end: endTime,
+                duration: endTime - startTime,
+              }
+            : seg,
+        ),
       );
     },
-    []
+    [],
   );
 
   // Keyboard shortcuts
@@ -254,7 +262,7 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
       "-": handleZoomOut,
       "0": handleResetZoom,
     },
-    true
+    true,
   );
 
   return (
@@ -318,7 +326,9 @@ export function VideoEditor({ video, className = "" }: VideoEditorProps) {
       {/* Waveform */}
       {isLoadingWaveform || isGeneratingWaveform ? (
         <div className="h-24 flex items-center justify-center text-sm text-muted-foreground">
-          {isGeneratingWaveform ? "Generating waveform..." : "Loading waveform..."}
+          {isGeneratingWaveform
+            ? "Generating waveform..."
+            : "Loading waveform..."}
         </div>
       ) : waveformData ? (
         <WaveformDisplay

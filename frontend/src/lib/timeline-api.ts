@@ -1,7 +1,7 @@
 // Timeline API client (waveform, segments, silence detection)
-import { tokenStorage } from './token-storage';
+import { tokenStorage } from "./token-storage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface WaveformData {
   id: string;
@@ -18,7 +18,12 @@ export interface WaveformParams {
   normalize?: boolean; // Normalize amplitude to 0-1 range (default: true)
 }
 
-export type SegmentType = 'speech' | 'silence' | 'music' | 'noise' | 'highlight';
+export type SegmentType =
+  | "speech"
+  | "silence"
+  | "music"
+  | "noise"
+  | "highlight";
 
 export interface Segment {
   id: string;
@@ -70,16 +75,16 @@ export interface AudioAnalysis {
 class TimelineAPI {
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const token = tokenStorage.getAccessToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
+      "Content-Type": "application/json",
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
@@ -88,8 +93,10 @@ class TimelineAPI {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || error.detail || 'API request failed');
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || error.detail || "API request failed");
     }
 
     // Handle 204 No Content responses
@@ -108,17 +115,22 @@ class TimelineAPI {
    * @param params - Waveform generation parameters
    * @returns Waveform data
    */
-  async generateWaveform(videoId: string, params?: WaveformParams): Promise<WaveformData> {
+  async generateWaveform(
+    videoId: string,
+    params?: WaveformParams,
+  ): Promise<WaveformData> {
     const queryParams = new URLSearchParams();
-    if (params?.resolution) queryParams.append('resolution', params.resolution.toString());
-    if (params?.normalize !== undefined) queryParams.append('normalize', params.normalize.toString());
+    if (params?.resolution)
+      queryParams.append("resolution", params.resolution.toString());
+    if (params?.normalize !== undefined)
+      queryParams.append("normalize", params.normalize.toString());
 
     const queryString = queryParams.toString();
     const endpoint = queryString
       ? `/api/videos/${videoId}/waveform?${queryString}`
       : `/api/videos/${videoId}/waveform`;
 
-    return this.request<WaveformData>(endpoint, { method: 'POST' });
+    return this.request<WaveformData>(endpoint, { method: "POST" });
   }
 
   /**
@@ -127,10 +139,15 @@ class TimelineAPI {
    * @param params - Query parameters for waveform resolution
    * @returns Waveform data
    */
-  async getWaveform(videoId: string, params?: WaveformParams): Promise<WaveformData> {
+  async getWaveform(
+    videoId: string,
+    params?: WaveformParams,
+  ): Promise<WaveformData> {
     const queryParams = new URLSearchParams();
-    if (params?.resolution) queryParams.append('resolution', params.resolution.toString());
-    if (params?.normalize !== undefined) queryParams.append('normalize', params.normalize.toString());
+    if (params?.resolution)
+      queryParams.append("resolution", params.resolution.toString());
+    if (params?.normalize !== undefined)
+      queryParams.append("normalize", params.normalize.toString());
 
     const queryString = queryParams.toString();
     const endpoint = queryString
@@ -145,7 +162,7 @@ class TimelineAPI {
    * @param videoId - Video ID
    */
   async deleteWaveform(videoId: string): Promise<void> {
-    await this.request(`/api/videos/${videoId}/waveform`, { method: 'DELETE' });
+    await this.request(`/api/videos/${videoId}/waveform`, { method: "DELETE" });
   }
 
   // ==================== Segment APIs ====================
@@ -170,8 +187,8 @@ class TimelineAPI {
    * @returns Created segment
    */
   async createSegment(data: SegmentCreateData): Promise<Segment> {
-    return this.request<Segment>('/api/segments', {
-      method: 'POST',
+    return this.request<Segment>("/api/segments", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -193,7 +210,7 @@ class TimelineAPI {
    */
   async updateSegment(id: string, data: SegmentUpdateData): Promise<Segment> {
     return this.request<Segment>(`/api/segments/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -203,7 +220,7 @@ class TimelineAPI {
    * @param id - Segment ID
    */
   async deleteSegment(id: string): Promise<void> {
-    await this.request(`/api/segments/${id}`, { method: 'DELETE' });
+    await this.request(`/api/segments/${id}`, { method: "DELETE" });
   }
 
   /**
@@ -216,7 +233,7 @@ class TimelineAPI {
       ? `/api/videos/${videoId}/segments?type=${type}`
       : `/api/videos/${videoId}/segments`;
 
-    await this.request(endpoint, { method: 'DELETE' });
+    await this.request(endpoint, { method: "DELETE" });
   }
 
   // ==================== Silence Detection APIs ====================
@@ -227,9 +244,12 @@ class TimelineAPI {
    * @param params - Silence detection parameters
    * @returns Array of silence segments
    */
-  async detectSilence(videoId: string, params?: SilenceDetectionParams): Promise<Segment[]> {
+  async detectSilence(
+    videoId: string,
+    params?: SilenceDetectionParams,
+  ): Promise<Segment[]> {
     return this.request<Segment[]>(`/api/videos/${videoId}/detect-silence`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params || {}),
     });
   }
@@ -240,11 +260,17 @@ class TimelineAPI {
    * @param params - Silence removal parameters
    * @returns Job ID for tracking the processing
    */
-  async removeSilence(videoId: string, params?: SilenceRemovalParams): Promise<{ job_id: string }> {
-    return this.request<{ job_id: string }>(`/api/videos/${videoId}/remove-silence`, {
-      method: 'POST',
-      body: JSON.stringify(params || {}),
-    });
+  async removeSilence(
+    videoId: string,
+    params?: SilenceRemovalParams,
+  ): Promise<{ job_id: string }> {
+    return this.request<{ job_id: string }>(
+      `/api/videos/${videoId}/remove-silence`,
+      {
+        method: "POST",
+        body: JSON.stringify(params || {}),
+      },
+    );
   }
 
   // ==================== Audio Analysis APIs ====================
@@ -255,9 +281,12 @@ class TimelineAPI {
    * @returns Audio analysis data
    */
   async analyzeAudio(videoId: string): Promise<AudioAnalysis> {
-    return this.request<AudioAnalysis>(`/api/videos/${videoId}/audio-analysis`, {
-      method: 'POST',
-    });
+    return this.request<AudioAnalysis>(
+      `/api/videos/${videoId}/audio-analysis`,
+      {
+        method: "POST",
+      },
+    );
   }
 
   /**
@@ -280,7 +309,7 @@ class TimelineAPI {
   async detectScenes(videoId: string, threshold?: number): Promise<Segment[]> {
     const params = threshold !== undefined ? { threshold } : {};
     return this.request<Segment[]>(`/api/videos/${videoId}/detect-scenes`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(params),
     });
   }
@@ -294,7 +323,7 @@ class TimelineAPI {
    */
   async detectHighlights(videoId: string): Promise<Segment[]> {
     return this.request<Segment[]>(`/api/videos/${videoId}/detect-highlights`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
@@ -310,10 +339,10 @@ class TimelineAPI {
   async getSegmentsByTimeRange(
     videoId: string,
     startTime: number,
-    endTime: number
+    endTime: number,
   ): Promise<Segment[]> {
     return this.request<Segment[]>(
-      `/api/videos/${videoId}/segments/range?start=${startTime}&end=${endTime}`
+      `/api/videos/${videoId}/segments/range?start=${startTime}&end=${endTime}`,
     );
   }
 
@@ -325,7 +354,7 @@ class TimelineAPI {
    */
   async mergeSegments(videoId: string, type: SegmentType): Promise<Segment[]> {
     return this.request<Segment[]>(`/api/videos/${videoId}/segments/merge`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({ type }),
     });
   }

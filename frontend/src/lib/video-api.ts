@@ -1,9 +1,9 @@
 // Video management API client
-import { tokenStorage } from './token-storage';
+import { tokenStorage } from "./token-storage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export type VideoStatus = 'uploaded' | 'processing' | 'completed' | 'failed';
+export type VideoStatus = "uploaded" | "processing" | "completed" | "failed";
 
 export interface Video {
   id: string;
@@ -27,8 +27,8 @@ export interface VideoListParams {
   limit?: number;
   status?: VideoStatus;
   search?: string;
-  sort?: 'created_at' | 'title' | 'duration' | 'size';
-  order?: 'asc' | 'desc';
+  sort?: "created_at" | "title" | "duration" | "size";
+  order?: "asc" | "desc";
 }
 
 export interface VideoListResponse {
@@ -69,16 +69,16 @@ export interface VideoStats {
 class VideoAPI {
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const token = tokenStorage.getAccessToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
+      "Content-Type": "application/json",
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
@@ -87,8 +87,10 @@ class VideoAPI {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || error.detail || 'API request failed');
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || error.detail || "API request failed");
     }
 
     // Handle 204 No Content responses
@@ -109,10 +111,10 @@ class VideoAPI {
   async getPresignedUrl(
     filename: string,
     contentType: string,
-    size: number
+    size: number,
   ): Promise<PresignedUrlResponse> {
-    return this.request<PresignedUrlResponse>('/api/upload/presigned-url', {
-      method: 'POST',
+    return this.request<PresignedUrlResponse>("/api/upload/presigned-url", {
+      method: "POST",
       body: JSON.stringify({ filename, content_type: contentType, size }),
     });
   }
@@ -127,19 +129,19 @@ class VideoAPI {
   async uploadToS3(
     presignedUrl: string,
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
 
-      xhr.upload.addEventListener('progress', (e) => {
+      xhr.upload.addEventListener("progress", (e) => {
         if (e.lengthComputable && onProgress) {
           const progress = (e.loaded / e.total) * 100;
           onProgress(Math.round(progress));
         }
       });
 
-      xhr.addEventListener('load', () => {
+      xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           resolve();
         } else {
@@ -147,11 +149,11 @@ class VideoAPI {
         }
       });
 
-      xhr.addEventListener('error', () => reject(new Error('Upload failed')));
-      xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+      xhr.addEventListener("error", () => reject(new Error("Upload failed")));
+      xhr.addEventListener("abort", () => reject(new Error("Upload aborted")));
 
-      xhr.open('PUT', presignedUrl);
-      xhr.setRequestHeader('Content-Type', file.type);
+      xhr.open("PUT", presignedUrl);
+      xhr.setRequestHeader("Content-Type", file.type);
       xhr.send(file);
     });
   }
@@ -162,8 +164,8 @@ class VideoAPI {
    * @returns Created video object
    */
   async createVideo(data: VideoCreateData): Promise<Video> {
-    return this.request<Video>('/api/videos', {
-      method: 'POST',
+    return this.request<Video>("/api/videos", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -180,20 +182,20 @@ class VideoAPI {
     file: File,
     title: string,
     description?: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
   ): Promise<Video> {
     // Step 1: Get presigned URL (10% progress)
     onProgress?.(10);
     const { upload_url, video_id } = await this.getPresignedUrl(
       file.name,
       file.type,
-      file.size
+      file.size,
     );
 
     // Step 2: Upload to S3 (10-90% progress)
     await this.uploadToS3(upload_url, file, (uploadProgress) => {
       // Map 0-100 to 10-90
-      const mappedProgress = 10 + (uploadProgress * 0.8);
+      const mappedProgress = 10 + uploadProgress * 0.8;
       onProgress?.(Math.round(mappedProgress));
     });
 
@@ -226,7 +228,7 @@ class VideoAPI {
     });
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/api/videos?${queryString}` : '/api/videos';
+    const endpoint = queryString ? `/api/videos?${queryString}` : "/api/videos";
 
     return this.request<VideoListResponse>(endpoint);
   }
@@ -248,7 +250,7 @@ class VideoAPI {
    */
   async updateVideo(id: string, data: VideoUpdateData): Promise<Video> {
     return this.request<Video>(`/api/videos/${id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify(data),
     });
   }
@@ -258,7 +260,7 @@ class VideoAPI {
    * @param id - Video ID
    */
   async deleteVideo(id: string): Promise<void> {
-    await this.request(`/api/videos/${id}`, { method: 'DELETE' });
+    await this.request(`/api/videos/${id}`, { method: "DELETE" });
   }
 
   /**
@@ -266,9 +268,11 @@ class VideoAPI {
    * @param id - Video ID
    * @returns Playback URL (valid for limited time)
    */
-  async getPlaybackUrl(id: string): Promise<{ url: string; expires_in: number }> {
+  async getPlaybackUrl(
+    id: string,
+  ): Promise<{ url: string; expires_in: number }> {
     return this.request<{ url: string; expires_in: number }>(
-      `/api/videos/${id}/playback-url`
+      `/api/videos/${id}/playback-url`,
     );
   }
 
@@ -286,7 +290,7 @@ class VideoAPI {
    * @returns Video statistics
    */
   async getStats(): Promise<VideoStats> {
-    return this.request<VideoStats>('/api/videos/stats');
+    return this.request<VideoStats>("/api/videos/stats");
   }
 
   /**
@@ -296,7 +300,7 @@ class VideoAPI {
    */
   async retryProcessing(id: string): Promise<Video> {
     return this.request<Video>(`/api/videos/${id}/retry`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 

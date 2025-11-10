@@ -6,10 +6,10 @@
  */
 
 // API Clients
-export { authAPI } from './auth-api';
-export type { RegisterData, LoginData, User, AuthResponse } from './auth-api';
+export { authAPI } from "./auth-api";
+export type { RegisterData, LoginData, User, AuthResponse } from "./auth-api";
 
-export { videoAPI } from './video-api';
+export { videoAPI } from "./video-api";
 export type {
   Video,
   VideoStatus,
@@ -18,9 +18,9 @@ export type {
   VideoCreateData,
   VideoUpdateData,
   VideoStats,
-} from './video-api';
+} from "./video-api";
 
-export { transcriptAPI } from './transcript-api';
+export { transcriptAPI } from "./transcript-api";
 export type {
   Transcript,
   TranscriptStatus,
@@ -29,9 +29,9 @@ export type {
   TranscriptCreateData,
   TranscriptSearchParams,
   TranscriptSearchResult,
-} from './transcript-api';
+} from "./transcript-api";
 
-export { timelineAPI } from './timeline-api';
+export { timelineAPI } from "./timeline-api";
 export type {
   WaveformData,
   WaveformParams,
@@ -42,9 +42,9 @@ export type {
   SilenceDetectionParams,
   SilenceRemovalParams,
   AudioAnalysis,
-} from './timeline-api';
+} from "./timeline-api";
 
-export { clipAPI } from './clip-api';
+export { clipAPI } from "./clip-api";
 export type {
   Clip,
   ClipStatus,
@@ -56,7 +56,7 @@ export type {
   ClipExportParams,
   ClipListParams,
   ClipListResponse,
-} from './clip-api';
+} from "./clip-api";
 
 // Utilities
 export {
@@ -71,7 +71,7 @@ export {
   generateId,
   downloadFile,
   copyToClipboard,
-} from './utils';
+} from "./utils";
 
 // Validation
 export {
@@ -97,7 +97,28 @@ export {
   SUPPORTED_VIDEO_FORMATS,
   SUPPORTED_VIDEO_EXTENSIONS,
   MAX_VIDEO_SIZE,
-} from './validation';
+} from "./validation";
 
 // Token Storage
-export { tokenStorage } from './token-storage';
+export { tokenStorage } from "./token-storage";
+
+// API Client (base)
+export { apiRequest, uploadFile } from "./api-client";
+
+// Silence Removal API
+export {
+  detectSilence,
+  removeSilence,
+  getSilenceProgress,
+} from "./silence-api";
+export type {
+  SilenceSegment,
+  DetectSilenceRequest,
+  DetectSilenceResponse,
+  RemoveSilenceRequest,
+  RemoveSilenceResponse,
+  SilenceProgressResponse,
+} from "./silence-api";
+
+// Additional utility exports needed by editor components
+export { formatTime, calculateTotalDuration } from "./utils";

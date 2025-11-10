@@ -1,9 +1,13 @@
 // Transcript API client
-import { tokenStorage } from './token-storage';
+import { tokenStorage } from "./token-storage";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-export type TranscriptStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type TranscriptStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
 
 export interface TranscriptWord {
   word: string;
@@ -55,22 +59,22 @@ export interface TranscriptSearchResult {
 }
 
 export interface TranscriptExportFormat {
-  format: 'srt' | 'vtt' | 'txt' | 'json';
+  format: "srt" | "vtt" | "txt" | "json";
 }
 
 class TranscriptAPI {
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<T> {
     const token = tokenStorage.getAccessToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
+      "Content-Type": "application/json",
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
@@ -79,8 +83,10 @@ class TranscriptAPI {
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || error.detail || 'API request failed');
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || error.detail || "API request failed");
     }
 
     // Handle 204 No Content responses
@@ -97,8 +103,8 @@ class TranscriptAPI {
    * @returns Transcript object with pending status
    */
   async createTranscript(data: TranscriptCreateData): Promise<Transcript> {
-    return this.request<Transcript>('/api/transcripts', {
-      method: 'POST',
+    return this.request<Transcript>("/api/transcripts", {
+      method: "POST",
       body: JSON.stringify(data),
     });
   }
@@ -110,10 +116,12 @@ class TranscriptAPI {
    */
   async getTranscriptByVideoId(videoId: string): Promise<Transcript | null> {
     try {
-      return await this.request<Transcript>(`/api/transcripts/video/${videoId}`);
+      return await this.request<Transcript>(
+        `/api/transcripts/video/${videoId}`,
+      );
     } catch (error) {
       // Return null if transcript doesn't exist
-      if (error instanceof Error && error.message.includes('404')) {
+      if (error instanceof Error && error.message.includes("404")) {
         return null;
       }
       throw error;
@@ -137,12 +145,15 @@ class TranscriptAPI {
    */
   async searchTranscript(
     id: string,
-    params: TranscriptSearchParams
+    params: TranscriptSearchParams,
   ): Promise<TranscriptSearchResult[]> {
-    return this.request<TranscriptSearchResult[]>(`/api/transcripts/${id}/search`, {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
+    return this.request<TranscriptSearchResult[]>(
+      `/api/transcripts/${id}/search`,
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
+    );
   }
 
   /**
@@ -152,11 +163,18 @@ class TranscriptAPI {
    * @param text - New text for the segment
    * @returns Updated transcript
    */
-  async updateSegment(id: string, segmentId: string, text: string): Promise<Transcript> {
-    return this.request<Transcript>(`/api/transcripts/${id}/segments/${segmentId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ text }),
-    });
+  async updateSegment(
+    id: string,
+    segmentId: string,
+    text: string,
+  ): Promise<Transcript> {
+    return this.request<Transcript>(
+      `/api/transcripts/${id}/segments/${segmentId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ text }),
+      },
+    );
   }
 
   /**
@@ -165,21 +183,29 @@ class TranscriptAPI {
    * @param format - Export format (srt, vtt, txt, json)
    * @returns Blob containing the exported file
    */
-  async exportTranscript(id: string, format: 'srt' | 'vtt' | 'txt' | 'json'): Promise<Blob> {
+  async exportTranscript(
+    id: string,
+    format: "srt" | "vtt" | "txt" | "json",
+  ): Promise<Blob> {
     const token = tokenStorage.getAccessToken();
     const headers: Record<string, string> = {};
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_URL}/api/transcripts/${id}/export?format=${format}`, {
-      headers,
-    });
+    const response = await fetch(
+      `${API_URL}/api/transcripts/${id}/export?format=${format}`,
+      {
+        headers,
+      },
+    );
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.message || 'Export failed');
+      const error = await response
+        .json()
+        .catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || "Export failed");
     }
 
     return response.blob();
@@ -193,13 +219,13 @@ class TranscriptAPI {
    */
   async downloadTranscript(
     id: string,
-    format: 'srt' | 'vtt' | 'txt' | 'json',
-    filename?: string
+    format: "srt" | "vtt" | "txt" | "json",
+    filename?: string,
   ): Promise<void> {
     const blob = await this.exportTranscript(id, format);
     const url = window.URL.createObjectURL(blob);
 
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = filename || `transcript-${id}.${format}`;
     document.body.appendChild(link);
@@ -214,7 +240,7 @@ class TranscriptAPI {
    * @param id - Transcript ID
    */
   async deleteTranscript(id: string): Promise<void> {
-    await this.request(`/api/transcripts/${id}`, { method: 'DELETE' });
+    await this.request(`/api/transcripts/${id}`, { method: "DELETE" });
   }
 
   /**
@@ -224,7 +250,7 @@ class TranscriptAPI {
    */
   async retryTranscription(id: string): Promise<Transcript> {
     return this.request<Transcript>(`/api/transcripts/${id}/retry`, {
-      method: 'POST',
+      method: "POST",
     });
   }
 
@@ -255,7 +281,7 @@ class TranscriptAPI {
     id: string,
     onProgress?: (transcript: Transcript) => void,
     pollInterval: number = 2000,
-    maxAttempts: number = 150
+    maxAttempts: number = 150,
   ): Promise<Transcript> {
     let attempts = 0;
 
@@ -263,19 +289,19 @@ class TranscriptAPI {
       const transcript = await this.getTranscript(id);
       onProgress?.(transcript);
 
-      if (transcript.status === 'completed') {
+      if (transcript.status === "completed") {
         return transcript;
       }
 
-      if (transcript.status === 'failed') {
-        throw new Error(transcript.error_message || 'Transcription failed');
+      if (transcript.status === "failed") {
+        throw new Error(transcript.error_message || "Transcription failed");
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
       attempts++;
     }
 
-    throw new Error('Transcription timeout: Maximum polling attempts reached');
+    throw new Error("Transcription timeout: Maximum polling attempts reached");
   }
 
   /**
@@ -288,10 +314,10 @@ class TranscriptAPI {
   async getWordsByTimeRange(
     id: string,
     startTime: number,
-    endTime: number
+    endTime: number,
   ): Promise<TranscriptWord[]> {
     return this.request<TranscriptWord[]>(
-      `/api/transcripts/${id}/words?start=${startTime}&end=${endTime}`
+      `/api/transcripts/${id}/words?start=${startTime}&end=${endTime}`,
     );
   }
 
@@ -303,7 +329,7 @@ class TranscriptAPI {
    */
   async updateLanguage(id: string, language: string): Promise<Transcript> {
     return this.request<Transcript>(`/api/transcripts/${id}/language`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: JSON.stringify({ language }),
     });
   }
