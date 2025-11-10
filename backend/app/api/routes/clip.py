@@ -19,7 +19,6 @@ from app.schemas.clip import (
     SearchRequest,
     SearchResult,
 )
-from app.services.clip_generation import ClipGenerationService
 from app.services.search import SearchService
 
 router = APIRouter(prefix="/videos/{video_id}/clips", tags=["clips"])
@@ -52,9 +51,7 @@ async def search_transcript(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -64,9 +61,7 @@ async def search_transcript(
 
     # Search transcript
     service = SearchService(db)
-    results = await service.search_transcript(
-        video_id, request.keywords, request.padding_seconds
-    )
+    results = await service.search_transcript(video_id, request.keywords, request.padding_seconds)
 
     return [SearchResult(**result) for result in results]
 
@@ -97,9 +92,7 @@ async def create_clip(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -174,9 +167,7 @@ async def list_clips(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -215,9 +206,7 @@ async def get_clip(
     clip = result.scalar_one_or_none()
 
     if not clip:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found")
 
     # Verify video belongs to user
     result = await db.execute(select(Video).where(Video.id == clip.video_id))
@@ -253,9 +242,7 @@ async def delete_clip(
     clip = result.scalar_one_or_none()
 
     if not clip:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found")
 
     # Verify video belongs to user
     result = await db.execute(select(Video).where(Video.id == clip.video_id))
@@ -307,9 +294,7 @@ async def get_clip_progress(
     clip = result.scalar_one_or_none()
 
     if not clip:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found")
 
     # Verify video belongs to user
     result = await db.execute(select(Video).where(Video.id == clip.video_id))
@@ -347,4 +332,3 @@ async def get_clip_progress(
                 return ClipProgress(clip_id=clip_id, progress=0, status="Processing")
     finally:
         await redis_client.aclose()
-

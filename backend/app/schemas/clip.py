@@ -1,7 +1,6 @@
 """Clip API schemas."""
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -16,7 +15,7 @@ class ClipCreate(BaseModel):
     start_time: float = Field(..., ge=0, description="Start time in seconds")
     end_time: float = Field(..., gt=0, description="End time in seconds")
     title: str = Field(..., max_length=255)
-    description: Optional[str] = Field(None, max_length=1000)
+    description: str | None = Field(None, max_length=1000)
     keywords: list[str] = Field(default_factory=list)
 
 
@@ -26,12 +25,12 @@ class ClipRead(BaseModel):
     id: UUID
     video_id: UUID
     title: str
-    description: Optional[str] = None
+    description: str | None = None
     keywords: list[str]
     start_time: float
     end_time: float
-    duration: Optional[float] = None
-    clip_url: Optional[str] = None
+    duration: float | None = None
+    clip_url: str | None = None
     status: ClipStatus
     created_at: datetime
     updated_at: datetime
@@ -48,9 +47,7 @@ class ClipProgress(BaseModel):
     clip_id: UUID
     progress: int = Field(..., ge=0, le=100, description="Progress percentage (0-100)")
     status: str = Field(..., description="Current status message")
-    estimated_time_remaining: Optional[int] = Field(
-        None, description="Estimated seconds remaining"
-    )
+    estimated_time_remaining: int | None = Field(None, description="Estimated seconds remaining")
 
 
 class SearchRequest(BaseModel):
@@ -71,4 +68,3 @@ class SearchResult(BaseModel):
     transcript_excerpt: str
     relevance_score: float
     matched_keywords: list[str]
-

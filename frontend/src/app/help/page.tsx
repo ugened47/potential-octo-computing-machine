@@ -1,12 +1,18 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { faqData, type FAQItem } from '@/data/faq'
-import { Search, HelpCircle, Upload, Scissors, Download } from 'lucide-react'
-import Link from 'next/link'
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { faqData, type FAQItem } from "@/data/faq";
+import { Search, HelpCircle, Upload, Scissors, Download } from "lucide-react";
+import Link from "next/link";
 
 const categoryIcons = {
   general: HelpCircle,
@@ -14,22 +20,23 @@ const categoryIcons = {
   processing: Scissors,
   editing: Scissors,
   export: Download,
-}
+};
 
 export default function HelpPage() {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   const filteredFAQs = faqData.filter((faq) => {
     const matchesSearch =
-      searchQuery === '' ||
+      searchQuery === "" ||
       faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory
-    return matchesSearch && matchesCategory
-  })
+      faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory =
+      selectedCategory === "all" || faq.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
-  const categories = Array.from(new Set(faqData.map((faq) => faq.category)))
+  const categories = Array.from(new Set(faqData.map((faq) => faq.category)));
 
   return (
     <div className="container mx-auto py-8 max-w-4xl">
@@ -52,17 +59,21 @@ export default function HelpPage() {
         </div>
       </div>
 
-      <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+      <Tabs
+        value={selectedCategory}
+        onValueChange={setSelectedCategory}
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="all">All</TabsTrigger>
           {categories.map((category) => {
-            const Icon = categoryIcons[category as keyof typeof categoryIcons]
+            const Icon = categoryIcons[category as keyof typeof categoryIcons];
             return (
               <TabsTrigger key={category} value={category}>
                 {Icon && <Icon className="h-4 w-4 mr-2" />}
                 {category.charAt(0).toUpperCase() + category.slice(1)}
               </TabsTrigger>
-            )
+            );
           })}
         </TabsList>
 
@@ -70,7 +81,9 @@ export default function HelpPage() {
           {filteredFAQs.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center">
-                <p className="text-muted-foreground">No FAQs found matching your search.</p>
+                <p className="text-muted-foreground">
+                  No FAQs found matching your search.
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -81,7 +94,9 @@ export default function HelpPage() {
                     <CardTitle className="text-lg">{faq.question}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <CardDescription className="text-base">{faq.answer}</CardDescription>
+                    <CardDescription className="text-base">
+                      {faq.answer}
+                    </CardDescription>
                   </CardContent>
                 </Card>
               ))}
@@ -94,10 +109,15 @@ export default function HelpPage() {
         <Card>
           <CardHeader>
             <CardTitle>Getting Started</CardTitle>
-            <CardDescription>New to AI Video Editor? Start here.</CardDescription>
+            <CardDescription>
+              New to AI Video Editor? Start here.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/help/getting-started" className="text-primary hover:underline">
+            <Link
+              href="/help/getting-started"
+              className="text-primary hover:underline"
+            >
               View Getting Started Guide →
             </Link>
           </CardContent>
@@ -105,16 +125,20 @@ export default function HelpPage() {
         <Card>
           <CardHeader>
             <CardTitle>Keyboard Shortcuts</CardTitle>
-            <CardDescription>Speed up your workflow with shortcuts.</CardDescription>
+            <CardDescription>
+              Speed up your workflow with shortcuts.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/help/shortcuts" className="text-primary hover:underline">
+            <Link
+              href="/help/shortcuts"
+              className="text-primary hover:underline"
+            >
               View Keyboard Shortcuts →
             </Link>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
-

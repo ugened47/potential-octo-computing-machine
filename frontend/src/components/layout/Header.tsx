@@ -1,31 +1,38 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { useAuth } from '@/store/auth-store'
-import { LogOut, User, Video, Home } from 'lucide-react'
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/store/auth-store";
+import { LogOut, User, Video, Home } from "lucide-react";
 
 export function Header() {
-  const router = useRouter()
-  const pathname = usePathname()
-  const { user, logout, isAuthenticated } = useAuth()
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, logout, isAuthenticated } = useAuth();
 
   const handleLogout = async () => {
-    await logout()
-    router.push('/login')
-  }
+    await logout();
+    router.push("/login");
+  };
 
   // Don't show header on auth pages
-  if (!isAuthenticated || pathname?.startsWith('/login') || pathname?.startsWith('/register')) {
-    return null
+  if (
+    !isAuthenticated ||
+    pathname?.startsWith("/login") ||
+    pathname?.startsWith("/register")
+  ) {
+    return null;
   }
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold text-xl">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 font-bold text-xl"
+          >
             <Video className="h-6 w-6" />
             <span>AI Video Editor</span>
           </Link>
@@ -33,7 +40,9 @@ export function Header() {
             <Link
               href="/dashboard"
               className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === '/dashboard' ? 'text-primary' : 'text-muted-foreground'
+                pathname === "/dashboard"
+                  ? "text-primary"
+                  : "text-muted-foreground"
               }`}
             >
               <Home className="h-4 w-4 inline mr-1" />
@@ -42,7 +51,9 @@ export function Header() {
             <Link
               href="/upload"
               className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname === '/upload' ? 'text-primary' : 'text-muted-foreground'
+                pathname === "/upload"
+                  ? "text-primary"
+                  : "text-muted-foreground"
               }`}
             >
               Upload
@@ -50,7 +61,9 @@ export function Header() {
             <Link
               href="/help"
               className={`text-sm font-medium transition-colors hover:text-primary ${
-                pathname?.startsWith('/help') ? 'text-primary' : 'text-muted-foreground'
+                pathname?.startsWith("/help")
+                  ? "text-primary"
+                  : "text-muted-foreground"
               }`}
             >
               Help
@@ -71,6 +84,5 @@ export function Header() {
         </div>
       </div>
     </header>
-  )
+  );
 }
-

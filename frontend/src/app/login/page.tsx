@@ -1,32 +1,32 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { LoginForm } from '@/components/auth/LoginForm'
-import { useAuth } from '@/store/auth-store'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { LoginForm } from "@/components/auth/LoginForm";
+import { useAuth } from "@/store/auth-store";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter();
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
     // Redirect authenticated users away from login page
     if (!isLoading && isAuthenticated) {
-      router.push('/dashboard')
+      router.push("/dashboard");
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isAuthenticated, isLoading, router]);
 
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <LoadingSpinner size="lg" />
       </div>
-    )
+    );
   }
 
   if (isAuthenticated) {
-    return null // Will redirect
+    return null; // Will redirect
   }
 
   return (
@@ -41,6 +41,5 @@ export default function LoginPage() {
         <LoginForm />
       </div>
     </div>
-  )
+  );
 }
-
