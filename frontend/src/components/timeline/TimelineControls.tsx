@@ -1,23 +1,31 @@
-'use client'
+"use client";
 
-import { Play, Pause, SkipBack, SkipForward, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TimelineControlsProps {
-  isPlaying: boolean
-  currentTime: number
-  duration: number
-  playbackRate: number
-  zoomLevel: number
-  onPlayPause: () => void
-  onSeek: (time: number) => void
-  onSeekBackward: (seconds: number) => void
-  onSeekForward: (seconds: number) => void
-  onZoomIn: () => void
-  onZoomOut: () => void
-  onResetZoom: () => void
-  onPlaybackRateChange: (rate: number) => void
-  className?: string
+  isPlaying: boolean;
+  currentTime: number;
+  duration: number;
+  playbackRate: number;
+  zoomLevel: number;
+  onPlayPause: () => void;
+  onSeek: (time: number) => void;
+  onSeekBackward: (seconds: number) => void;
+  onSeekForward: (seconds: number) => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
+  onPlaybackRateChange: (rate: number) => void;
+  className?: string;
 }
 
 export function TimelineControls({
@@ -34,13 +42,13 @@ export function TimelineControls({
   onZoomOut,
   onResetZoom,
   onPlaybackRateChange,
-  className = '',
+  className = "",
 }: TimelineControlsProps) {
   const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div className={`flex items-center gap-2 p-2 border-t ${className}`}>
@@ -66,7 +74,7 @@ export function TimelineControls({
           variant="default"
           size="icon"
           onClick={onPlayPause}
-          title={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? "Pause" : "Play"}
         >
           {isPlaying ? (
             <Pause className="h-4 w-4" />
@@ -147,6 +155,5 @@ export function TimelineControls({
         </Button>
       </div>
     </div>
-  )
+  );
 }
-

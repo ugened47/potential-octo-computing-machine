@@ -1,7 +1,7 @@
 """Transcript API schemas."""
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ class WordTimestamp(BaseModel):
     word: str
     start: float = Field(..., description="Start time in seconds")
     end: float = Field(..., description="End time in seconds")
-    confidence: Optional[float] = Field(None, description="Confidence score (0-1)")
+    confidence: float | None = Field(None, description="Confidence score (0-1)")
 
 
 class TranscriptRead(BaseModel):
@@ -25,12 +25,12 @@ class TranscriptRead(BaseModel):
     video_id: UUID
     full_text: str
     word_timestamps: dict[str, Any]
-    language: Optional[str] = None
+    language: str | None = None
     status: TranscriptStatus
-    accuracy_score: Optional[float] = None
+    accuracy_score: float | None = None
     created_at: datetime
     updated_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     class Config:
         """Pydantic config."""
@@ -44,13 +44,10 @@ class TranscriptProgress(BaseModel):
     video_id: UUID
     progress: int = Field(..., ge=0, le=100, description="Progress percentage (0-100)")
     status: str = Field(..., description="Current status message")
-    estimated_time_remaining: Optional[int] = Field(
-        None, description="Estimated seconds remaining"
-    )
+    estimated_time_remaining: int | None = Field(None, description="Estimated seconds remaining")
 
 
 class TranscriptExportRequest(BaseModel):
     """Transcript export request."""
 
     format: str = Field(..., description="Export format: srt or vtt")
-

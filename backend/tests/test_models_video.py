@@ -1,11 +1,11 @@
 """Tests for Video model."""
 
+
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-from uuid import uuid4
 
-from app.models.video import Video, VideoStatus
 from app.models.user import User
+from app.models.video import Video, VideoStatus
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_video_model_foreign_key_relationship(db_session: AsyncSession):
 
     # Verify foreign key relationship
     assert video.user_id == user.id
-    
+
     # Verify user_id is indexed (can't directly test index, but foreign key exists)
     # The relationship is established through the foreign key constraint
 
@@ -173,7 +173,7 @@ async def test_video_model_optional_fields(db_session: AsyncSession):
 async def test_video_model_timestamps(db_session: AsyncSession):
     """Test Video model timestamps are automatically set."""
     from datetime import datetime
-    
+
     user = User(email="test@example.com", hashed_password="hashed")
     db_session.add(user)
     await db_session.commit()
@@ -196,4 +196,3 @@ async def test_video_model_timestamps(db_session: AsyncSession):
     now = datetime.utcnow()
     assert abs((now - video.created_at).total_seconds()) < 60
     assert abs((now - video.updated_at).total_seconds()) < 60
-

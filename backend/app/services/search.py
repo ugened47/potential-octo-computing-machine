@@ -161,9 +161,7 @@ class SearchService:
 
             # Build excerpt
             excerpt_words = context_before[-3:] + segment_words + context_after[:3]
-            excerpt = " ".join(
-                word.get("word", "") for word in excerpt_words if word.get("word")
-            )
+            excerpt = " ".join(word.get("word", "") for word in excerpt_words if word.get("word"))
 
             # Count matched keywords
             matched_keywords = []
@@ -188,4 +186,3 @@ class SearchService:
             )
 
         return results
-

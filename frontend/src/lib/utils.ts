@@ -1,86 +1,96 @@
-/** Common utility functions. */
-
-import { type ClassValue, clsx } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /**
- * Merge Tailwind CSS classes with clsx.
+ * Utility function to merge Tailwind CSS classes
+ * Used by Shadcn UI components
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
- * Format file size in human-readable format.
+ * Format file size in bytes to human-readable format
  * @param bytes - File size in bytes
- * @returns Formatted file size (e.g., "1.5 MB")
+ * @param decimals - Number of decimal places (default: 2)
+ * @returns Formatted file size string (e.g., "1.5 MB")
  */
-export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
+export function formatFileSize(bytes: number, decimals: number = 2): string {
+  if (bytes === 0) return '0 Bytes';
 
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
 
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 /**
- * Format duration in seconds to MM:SS or HH:MM:SS format.
+ * Format duration in seconds to human-readable format
  * @param seconds - Duration in seconds
- * @returns Formatted duration string
+ * @returns Formatted duration string (e.g., "1:23:45" or "12:34")
  */
 export function formatDuration(seconds: number): string {
-  if (!seconds || seconds < 0) return '00:00'
+  if (isNaN(seconds) || seconds < 0) return '0:00';
 
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
 
   if (hours > 0) {
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
-  return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
 /**
- * Format a date to relative time (e.g., "2 hours ago").
- * @param date - Date string or Date object
+ * Format a date to relative time (e.g., "2 hours ago", "3 days ago")
+ * @param date - Date to format
  * @returns Relative time string
  */
-export function formatRelativeTime(date: string | Date): string {
-  const now = new Date()
-  const then = typeof date === 'string' ? new Date(date) : date
-  const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000)
+export function formatRelativeTime(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - dateObj.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
 
-  if (diffInSeconds < 60) return 'just now'
-  if (diffInSeconds < 3600) {
-    const minutes = Math.floor(diffInSeconds / 60)
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
-  }
-  if (diffInSeconds < 86400) {
-    const hours = Math.floor(diffInSeconds / 3600)
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  }
-  if (diffInSeconds < 604800) {
-    const days = Math.floor(diffInSeconds / 86400)
-    return `${days} day${days > 1 ? 's' : ''} ago`
-  }
-  if (diffInSeconds < 2592000) {
-    const weeks = Math.floor(diffInSeconds / 604800)
-    return `${weeks} week${weeks > 1 ? 's' : ''} ago`
-  }
-  if (diffInSeconds < 31536000) {
-    const months = Math.floor(diffInSeconds / 2592000)
-    return `${months} month${months > 1 ? 's' : ''} ago`
-  }
-  const years = Math.floor(diffInSeconds / 31536000)
-  return `${years} year${years > 1 ? 's' : ''} ago`
+  if (diffSecs < 60) return 'just now';
+  if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+  if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+  if (diffDays < 7) return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+  if (diffWeeks < 4) return `${diffWeeks} ${diffWeeks === 1 ? 'week' : 'weeks'} ago`;
+  if (diffMonths < 12) return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`;
+  return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago`;
 }
 
 /**
- * Debounce a function call.
+ * Format timestamp for display (e.g., "Jan 15, 2025 at 3:45 PM")
+ * @param date - Date to format
+ * @returns Formatted date string
+ */
+export function formatTimestamp(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  return dateObj.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/**
+ * Debounce function to limit function call frequency
  * @param func - Function to debounce
  * @param wait - Wait time in milliseconds
  * @returns Debounced function
@@ -89,36 +99,108 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null
+  let timeout: NodeJS.Timeout | null = null;
 
   return function executedFunction(...args: Parameters<T>) {
     const later = () => {
-      timeout = null
-      func(...args)
-    }
+      timeout = null;
+      func(...args);
+    };
 
     if (timeout) {
-      clearTimeout(timeout)
+      clearTimeout(timeout);
     }
-    timeout = setTimeout(later, wait)
-  }
+    timeout = setTimeout(later, wait);
+  };
 }
 
 /**
- * Truncate text to a maximum length.
- * @param text - Text to truncate
- * @param maxLength - Maximum length
- * @returns Truncated text with ellipsis if needed
+ * Throttle function to limit function call frequency
+ * @param func - Function to throttle
+ * @param limit - Time limit in milliseconds
+ * @returns Throttled function
  */
-export function truncate(text: string, maxLength: number): string {
-  if (text.length <= maxLength) return text
-  return text.slice(0, maxLength - 3) + '...'
+export function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  limit: number
+): (...args: Parameters<T>) => void {
+  let inThrottle: boolean = false;
+
+  return function executedFunction(...args: Parameters<T>) {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
 }
 
 /**
- * Sleep for a specified duration.
- * @param ms - Duration in milliseconds
+ * Sleep/delay function for async operations
+ * @param ms - Milliseconds to sleep
+ * @returns Promise that resolves after delay
  */
 export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Generate a random ID (simple implementation)
+ * For production, consider using a library like uuid
+ * @param length - Length of the ID (default: 8)
+ * @returns Random ID string
+ */
+export function generateId(length: number = 8): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Download a file from a URL
+ * @param url - File URL
+ * @param filename - Filename to save as
+ */
+export async function downloadFile(url: string, filename: string): Promise<void> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  window.URL.revokeObjectURL(blobUrl);
+}
+
+/**
+ * Copy text to clipboard
+ * @param text - Text to copy
+ * @returns Promise that resolves when copied
+ */
+export async function copyToClipboard(text: string): Promise<void> {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+  } else {
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+    document.body.removeChild(textArea);
+  }
 }

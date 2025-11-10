@@ -1,14 +1,13 @@
 """API dependencies for dependency injection."""
 
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.core.config import settings
 from app.core.db import async_session_maker
 from app.core.exceptions import AuthenticationError, AuthorizationError, NotFoundError
 from app.core.security import decode_token
@@ -59,7 +58,7 @@ async def get_current_user(
         raise AuthenticationError("Invalid token type")
 
     # Get user ID from token
-    user_id_str: Optional[str] = payload.get("sub")
+    user_id_str: str | None = payload.get("sub")
     if not user_id_str:
         raise AuthenticationError("Token missing user ID")
 

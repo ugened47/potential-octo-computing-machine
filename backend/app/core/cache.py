@@ -1,14 +1,14 @@
 """Redis caching utilities."""
 
 import json
-from typing import Any, Optional
+from typing import Any
 
 import redis.asyncio as redis
 
 from app.core.config import settings
 
 # Global Redis client (lazy initialization)
-_redis_client: Optional[redis.Redis] = None
+_redis_client: redis.Redis | None = None
 
 
 async def get_redis_client() -> redis.Redis:
@@ -35,7 +35,7 @@ async def close_redis() -> None:
         _redis_client = None
 
 
-async def get_cache(key: str) -> Optional[Any]:
+async def get_cache(key: str) -> Any | None:
     """Get value from cache.
 
     Args:
@@ -99,4 +99,3 @@ async def invalidate_pattern(pattern: str) -> None:
     except Exception:
         # If Redis fails, silently continue
         pass
-

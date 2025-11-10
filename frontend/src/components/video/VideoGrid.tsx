@@ -1,16 +1,20 @@
-'use client'
+"use client";
 
-import { memo } from 'react'
-import { VideoCard } from './VideoCard'
-import type { Video } from '@/types/video'
+import { memo } from "react";
+import { VideoCard } from "./VideoCard";
+import type { Video } from "@/types/video";
 
 interface VideoGridProps {
-  videos: Video[]
-  onDelete?: (videoId: string) => void
-  onEdit?: (videoId: string) => void
+  videos: Video[];
+  onDelete?: (videoId: string) => void;
+  onEdit?: (videoId: string) => void;
 }
 
-export const VideoGrid = memo(function VideoGrid({ videos, onDelete, onEdit }: VideoGridProps) {
+export const VideoGrid = memo(function VideoGrid({
+  videos,
+  onDelete,
+  onEdit,
+}: VideoGridProps) {
   if (videos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -19,7 +23,7 @@ export const VideoGrid = memo(function VideoGrid({ videos, onDelete, onEdit }: V
           Upload your first video to get started
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -33,6 +37,5 @@ export const VideoGrid = memo(function VideoGrid({ videos, onDelete, onEdit }: V
         />
       ))}
     </div>
-  )
-})
-
+  );
+});

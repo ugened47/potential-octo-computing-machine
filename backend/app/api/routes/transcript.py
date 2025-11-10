@@ -10,7 +10,6 @@ from app.api.deps import get_current_user, get_db
 from app.models.user import User
 from app.models.video import Video
 from app.schemas.transcript import (
-    TranscriptExportRequest,
     TranscriptProgress,
     TranscriptRead,
 )
@@ -46,9 +45,7 @@ async def get_transcript(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -61,9 +58,7 @@ async def get_transcript(
     transcript = await service.get_transcript(video_id)
 
     if not transcript:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found")
 
     return TranscriptRead.model_validate(transcript)
 
@@ -95,9 +90,7 @@ async def trigger_transcription(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -168,9 +161,7 @@ async def export_transcript(
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -183,9 +174,7 @@ async def export_transcript(
     transcript = await service.get_transcript(video_id)
 
     if not transcript:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Transcript not found")
 
     # Format transcript
     if format.lower() == "srt":
@@ -231,18 +220,16 @@ async def get_transcription_progress(
     """
     import redis.asyncio as redis
 
-    from app.core.config import settings
-
     # Verify video exists and belongs to user
     from sqlmodel import select
+
+    from app.core.config import settings
 
     result = await db.execute(select(Video).where(Video.id == video_id))
     video = result.scalar_one_or_none()
 
     if not video:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Video not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found")
 
     if video.user_id != current_user.id:
         raise HTTPException(
@@ -275,21 +262,12 @@ async def get_transcription_progress(
                 from app.models.transcript import TranscriptStatus
 
                 if transcript.status == TranscriptStatus.COMPLETED:
-                    return TranscriptProgress(
-                        video_id=video_id, progress=100, status="Completed"
-                    )
+                    return TranscriptProgress(video_id=video_id, progress=100, status="Completed")
                 elif transcript.status == TranscriptStatus.FAILED:
-                    return TranscriptProgress(
-                        video_id=video_id, progress=0, status="Failed"
-                    )
+                    return TranscriptProgress(video_id=video_id, progress=0, status="Failed")
                 else:
-                    return TranscriptProgress(
-                        video_id=video_id, progress=0, status="Processing"
-                    )
+                    return TranscriptProgress(video_id=video_id, progress=0, status="Processing")
             else:
-                return TranscriptProgress(
-                    video_id=video_id, progress=0, status="Not started"
-                )
+                return TranscriptProgress(video_id=video_id, progress=0, status="Not started")
     finally:
         await redis_client.aclose()
-

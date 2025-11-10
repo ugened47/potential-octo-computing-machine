@@ -19,12 +19,12 @@ class S3Service:
             "aws_secret_access_key": settings.aws_secret_access_key,
             "region_name": settings.aws_region,
         }
-        
+
         # Add endpoint URL for MinIO in development
         endpoint_url = settings.s3_endpoint_url
         if endpoint_url:
             client_kwargs["endpoint_url"] = endpoint_url
-        
+
         self.s3_client = boto3.client(**client_kwargs)
         self.bucket = settings.s3_bucket
 
@@ -50,13 +50,13 @@ class S3Service:
         """
         # Extract file extension
         file_ext = filename.split(".")[-1] if "." in filename else ""
-        
+
         # Generate UUID filename to avoid collisions
         uuid_filename = f"{uuid4()}.{file_ext}" if file_ext else str(uuid4())
-        
+
         # Build S3 key: videos/{user_id}/{video_id}/{uuid_filename}
         s3_key = f"videos/{user_id}/{video_id}/{uuid_filename}"
-        
+
         try:
             presigned_url = self.s3_client.generate_presigned_url(
                 "put_object",
@@ -83,7 +83,7 @@ class S3Service:
         """
         if not settings.cloudfront_domain:
             return None
-        
+
         # Ensure CloudFront domain doesn't have protocol
         domain = settings.cloudfront_domain.replace("https://", "").replace("http://", "")
         return f"https://{domain}/{s3_key}"
@@ -119,9 +119,7 @@ class S3Service:
                     # AWS S3: create bucket with location constraint
                     self.s3_client.create_bucket(
                         Bucket=self.bucket,
-                        CreateBucketConfiguration={
-                            "LocationConstraint": settings.aws_region
-                        },
+                        CreateBucketConfiguration={"LocationConstraint": settings.aws_region},
                     )
             except ClientError as e:
                 raise ValueError(f"Failed to create bucket: {str(e)}") from e
@@ -142,11 +140,9 @@ class S3Service:
                 }
             ]
         }
-        
+
         try:
-            self.s3_client.put_bucket_cors(
-                Bucket=self.bucket, CORSConfiguration=cors_configuration
-            )
+            self.s3_client.put_bucket_cors(Bucket=self.bucket, CORSConfiguration=cors_configuration)
         except ClientError as e:
             raise ValueError(f"Failed to configure CORS: {str(e)}") from e
 
@@ -171,7 +167,7 @@ class S3Service:
         """
         # Build S3 key: thumbnails/{user_id}/{video_id}/thumbnail.jpg
         s3_key = f"thumbnails/{user_id}/{video_id}/thumbnail.jpg"
-        
+
         try:
             with open(thumbnail_path, "rb") as thumbnail_file:
                 self.s3_client.upload_fileobj(
@@ -181,7 +177,7 @@ class S3Service:
                     ExtraArgs={"ContentType": "image/jpeg"},
                 )
             return s3_key
-        except (ClientError, IOError) as e:
+        except (OSError, ClientError) as e:
             raise ValueError(f"Failed to upload thumbnail: {str(e)}") from e
 
     def get_thumbnail_url(self, s3_key: str) -> str:
@@ -196,7 +192,7 @@ class S3Service:
         if settings.cloudfront_domain:
             domain = settings.cloudfront_domain.replace("https://", "").replace("http://", "")
             return f"https://{domain}/{s3_key}"
-        
+
         # Generate presigned URL for MinIO/local development
         try:
             url = self.s3_client.generate_presigned_url(
@@ -207,4 +203,3 @@ class S3Service:
             return url
         except ClientError as e:
             raise ValueError(f"Failed to generate thumbnail URL: {str(e)}") from e
-

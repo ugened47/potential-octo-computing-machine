@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { OnboardingStep } from './OnboardingStep'
-import { useOnboarding } from '@/store/onboarding-store'
-import { Video, Search, Scissors, Download } from 'lucide-react'
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { OnboardingStep } from "./OnboardingStep";
+import { useOnboarding } from "@/store/onboarding-store";
+import { Video, Search, Scissors, Download } from "lucide-react";
 
 const steps = [
   {
-    title: 'Welcome to AI Video Editor',
-    description: 'Let\'s get you started with a quick tour of the platform.',
+    title: "Welcome to AI Video Editor",
+    description: "Let's get you started with a quick tour of the platform.",
     content: (
       <div className="space-y-4">
         <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
@@ -35,7 +35,8 @@ const steps = [
           <div>
             <h3 className="font-semibold">Smart Clipping</h3>
             <p className="text-sm text-muted-foreground">
-              Find highlights using keyword search and create clips automatically.
+              Find highlights using keyword search and create clips
+              automatically.
             </p>
           </div>
         </div>
@@ -52,8 +53,8 @@ const steps = [
     ),
   },
   {
-    title: 'Upload Your First Video',
-    description: 'Start by uploading a video to get started.',
+    title: "Upload Your First Video",
+    description: "Start by uploading a video to get started.",
     content: (
       <div className="space-y-4">
         <div className="p-6 border-2 border-dashed rounded-lg text-center">
@@ -72,8 +73,8 @@ const steps = [
     ),
   },
   {
-    title: 'Explore the Dashboard',
-    description: 'Your dashboard is where you manage all your videos.',
+    title: "Explore the Dashboard",
+    description: "Your dashboard is where you manage all your videos.",
     content: (
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -106,8 +107,8 @@ const steps = [
     ),
   },
   {
-    title: 'You\'re All Set!',
-    description: 'Start creating amazing video content with AI-powered tools.',
+    title: "You're All Set!",
+    description: "Start creating amazing video content with AI-powered tools.",
     content: (
       <div className="space-y-4 text-center">
         <div className="p-8">
@@ -122,33 +123,34 @@ const steps = [
       </div>
     ),
   },
-]
+];
 
 export function OnboardingWizard() {
-  const router = useRouter()
-  const { currentStep, completeStep, skipOnboarding, setCurrentStep } = useOnboarding()
+  const router = useRouter();
+  const { currentStep, completeStep, skipOnboarding, setCurrentStep } =
+    useOnboarding();
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
-      completeStep(currentStep)
+      completeStep(currentStep);
     } else {
-      completeStep(currentStep)
-      router.push('/dashboard')
+      completeStep(currentStep);
+      router.push("/dashboard");
     }
-  }
+  };
 
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1)
+      setCurrentStep(currentStep - 1);
     }
-  }
+  };
 
   const handleSkip = () => {
-    skipOnboarding()
-    router.push('/dashboard')
-  }
+    skipOnboarding();
+    router.push("/dashboard");
+  };
 
-  const currentStepData = steps[currentStep]
+  const currentStepData = steps[currentStep];
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -166,6 +168,5 @@ export function OnboardingWizard() {
         {currentStepData.content}
       </OnboardingStep>
     </div>
-  )
+  );
 }
-

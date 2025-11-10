@@ -3,7 +3,7 @@
 import json
 import os
 import tempfile
-from typing import Callable, Optional
+from collections.abc import Callable
 from uuid import UUID
 
 import av
@@ -59,7 +59,7 @@ class WaveformService:
                 for frame in packet.decode():
                     if frame:
                         # Resample if needed
-                        frame_rate = getattr(frame, 'rate', sample_rate)
+                        frame_rate = getattr(frame, "rate", sample_rate)
                         if frame_rate != sample_rate:
                             frame.pts = None
                             resampled = frame.resample(sample_rate)
@@ -79,9 +79,7 @@ class WaveformService:
         except Exception as e:
             raise ValueError(f"Failed to extract audio: {str(e)}") from e
 
-    def generate_waveform_peaks(
-        self, audio_path: str, samples: int = 2000
-    ) -> list[float]:
+    def generate_waveform_peaks(self, audio_path: str, samples: int = 2000) -> list[float]:
         """Generate waveform peaks data from audio file.
 
         Args:
@@ -193,9 +191,10 @@ class WaveformService:
         Returns:
             S3 key of uploaded waveform data
         """
+        from io import BytesIO
+
         import boto3
         from botocore.exceptions import ClientError
-        from io import BytesIO
 
         waveform_data = {
             "peaks": peaks,
@@ -269,7 +268,7 @@ class WaveformService:
     async def generate_waveform(
         self,
         video_id: UUID,
-        update_progress: Optional[Callable[[int], None]] = None,
+        update_progress: Callable[[int], None] | None = None,
     ) -> dict:
         """Generate waveform data for a video (full workflow).
 
@@ -360,4 +359,3 @@ class WaveformService:
                 os.unlink(video_path)
             if audio_path and os.path.exists(audio_path):
                 os.unlink(audio_path)
-

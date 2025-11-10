@@ -2,7 +2,7 @@
 
 import os
 import tempfile
-from typing import Callable, Optional
+from collections.abc import Callable
 from uuid import UUID
 
 import av
@@ -26,7 +26,7 @@ class VideoMetadataService:
         self.db = db
         self.s3_service = S3Service()
 
-    def extract_metadata(self, video_path: str) -> dict[str, Optional[str | float]]:
+    def extract_metadata(self, video_path: str) -> dict[str, str | float | None]:
         """Extract metadata from video file using PyAV.
 
         Args:
@@ -40,7 +40,7 @@ class VideoMetadataService:
         """
         try:
             container = av.open(video_path)
-            
+
             # Find video stream
             video_stream = None
             for stream in container.streams.video:
@@ -83,7 +83,9 @@ class VideoMetadataService:
         except Exception as e:
             raise ValueError(f"Failed to extract metadata: {str(e)}") from e
 
-    def generate_thumbnail(self, video_path: str, output_path: str, time_offset: float = 1.0) -> None:
+    def generate_thumbnail(
+        self, video_path: str, output_path: str, time_offset: float = 1.0
+    ) -> None:
         """Generate thumbnail from video at specified time offset.
 
         Args:
@@ -96,7 +98,7 @@ class VideoMetadataService:
         """
         try:
             container = av.open(video_path)
-            
+
             # Find video stream
             video_stream = None
             for stream in container.streams.video:
@@ -149,8 +151,9 @@ class VideoMetadataService:
 
             # Convert to RGB and save as JPEG
             frame_rgb = frame.to_ndarray(format="rgb24")
-            
+
             from PIL import Image
+
             img = Image.fromarray(frame_rgb)
             img.save(output_path, "JPEG", quality=85)
 
@@ -175,20 +178,20 @@ class VideoMetadataService:
             "aws_secret_access_key": settings.aws_secret_access_key,
             "region_name": settings.aws_region,
         }
-        
+
         endpoint_url = settings.s3_endpoint_url
         if endpoint_url:
             client_kwargs["endpoint_url"] = endpoint_url
-        
+
         s3_client = boto3.client(**client_kwargs)
-        
+
         try:
             s3_client.download_file(settings.s3_bucket, s3_key, local_path)
         except ClientError as e:
             raise ValueError(f"Failed to download video from S3: {str(e)}") from e
 
     async def extract_video_metadata(
-        self, video_id: UUID, update_progress: Optional[Callable[[int], None]] = None
+        self, video_id: UUID, update_progress: Callable[[int], None] | None = None
     ) -> Video:
         """Extract metadata for a video (full workflow).
 
@@ -282,4 +285,3 @@ class VideoMetadataService:
             # Clean up video file
             if os.path.exists(video_path):
                 os.unlink(video_path)
-

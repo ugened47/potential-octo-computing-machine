@@ -1,58 +1,58 @@
-'use client'
+"use client";
 
-import { useState, FormEvent } from 'react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { forgotPassword } from '@/lib/auth-api'
-import { validateEmail } from '@/lib/validation'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { forgotPassword } from "@/lib/auth-api";
+import { validateEmail } from "@/lib/validation";
+import { Loader2, CheckCircle2 } from "lucide-react";
 
 export function ForgotPasswordForm() {
-  const [email, setEmail] = useState('')
-  const [emailError, setEmailError] = useState('')
-  const [generalError, setGeneralError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [generalError, setGeneralError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const handleEmailBlur = () => {
     if (!email) {
-      setEmailError('Email is required')
+      setEmailError("Email is required");
     } else if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
+      setEmailError("Please enter a valid email address");
     } else {
-      setEmailError('')
+      setEmailError("");
     }
-  }
+  };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setGeneralError('')
+    e.preventDefault();
+    setGeneralError("");
 
     // Validate
     if (!email) {
-      setEmailError('Email is required')
-      return
+      setEmailError("Email is required");
+      return;
     }
     if (!validateEmail(email)) {
-      setEmailError('Please enter a valid email address')
-      return
+      setEmailError("Please enter a valid email address");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await forgotPassword(email)
-      setIsSuccess(true)
+      await forgotPassword(email);
+      setIsSuccess(true);
     } catch (error: any) {
       if (error.response?.data?.detail) {
-        setGeneralError(error.response.data.detail)
+        setGeneralError(error.response.data.detail);
       } else {
-        setGeneralError('Failed to send reset email. Please try again.')
+        setGeneralError("Failed to send reset email. Please try again.");
       }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   if (isSuccess) {
     return (
@@ -73,7 +73,7 @@ export function ForgotPasswordForm() {
           </Button>
         </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -96,11 +96,9 @@ export function ForgotPasswordForm() {
           onBlur={handleEmailBlur}
           placeholder="you@example.com"
           disabled={isLoading}
-          className={emailError ? 'border-destructive' : ''}
+          className={emailError ? "border-destructive" : ""}
         />
-        {emailError && (
-          <p className="text-sm text-destructive">{emailError}</p>
-        )}
+        {emailError && <p className="text-sm text-destructive">{emailError}</p>}
         <p className="text-xs text-muted-foreground">
           Enter your email address and we'll send you a link to reset your
           password.
@@ -114,7 +112,7 @@ export function ForgotPasswordForm() {
             Sending...
           </>
         ) : (
-          'Send reset link'
+          "Send reset link"
         )}
       </Button>
 
@@ -124,6 +122,5 @@ export function ForgotPasswordForm() {
         </Link>
       </div>
     </form>
-  )
+  );
 }
-

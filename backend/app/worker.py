@@ -79,9 +79,7 @@ async def transcribe_video(ctx: dict[str, Any], video_id: str) -> dict[str, Any]
     except Exception as e:
         # Update transcript status to failed
         async with async_session_maker() as db:
-            result = await db.execute(
-                select(Transcript).where(Transcript.video_id == video_uuid)
-            )
+            result = await db.execute(select(Transcript).where(Transcript.video_id == video_uuid))
             transcript = result.scalar_one_or_none()
 
             if transcript:
@@ -137,7 +135,7 @@ async def extract_video_metadata(ctx: dict[str, Any], video_id: str) -> dict[str
     # Create sync wrapper that schedules async callback
     # Since we're in an async context, we can use create_task
     import asyncio
-    
+
     def update_progress(progress: int) -> None:
         """Sync wrapper for async progress update - fire and forget."""
         # Schedule the async callback (fire and forget)
