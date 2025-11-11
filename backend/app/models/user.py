@@ -23,3 +23,12 @@ class User(SQLModel, table=True):
     # OAuth fields
     oauth_provider: str | None = Field(default=None, max_length=50)
     oauth_id: str | None = Field(default=None, max_length=255)
+
+    # Email verification
+    email_verified: bool = Field(default=False)
+    email_verification_token: str | None = Field(default=None, max_length=255)
+    email_verification_expires: datetime | None = Field(default=None)
+
+    # Password reset
+    password_reset_token: str | None = Field(default=None, max_length=255)
+    password_reset_expires: datetime | None = Field(default=None)
