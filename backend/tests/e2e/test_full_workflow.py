@@ -1,9 +1,24 @@
-"""End-to-end tests for complete video processing workflow."""
+"""
+End-to-end tests for complete video processing workflow.
+
+These tests cover the entire user journey through the application,
+testing integration between all components: auth, video management,
+transcription, clipping, timeline editing, and silence removal.
+
+Tests follow the red/green/refactor methodology and include:
+- Happy path workflows
+- Error scenarios
+- User isolation
+- Concurrency handling
+- Edge cases
+"""
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 from io import BytesIO
+import asyncio
+from uuid import uuid4
 
 
 def test_complete_video_workflow(client: TestClient):
