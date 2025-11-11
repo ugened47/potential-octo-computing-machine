@@ -11,6 +11,20 @@ from .auth import (
     UserRegister,
     UserResponse,
 )
+from .batch import (
+    AddVideosRequest,
+    BatchExportRequest,
+    BatchExportResponse,
+    BatchJobCreate,
+    BatchJobCreateResponse,
+    BatchJobListResponse,
+    BatchJobResponse,
+    BatchJobStartResponse,
+    BatchProgressEvent,
+    BatchSettings,
+    BatchVideoResponse,
+    UploadProgress,
+)
 from .clip import (
     ClipCreate,
     ClipProgress,
@@ -64,4 +78,16 @@ __all__ = [
     "WaveformStatus",
     "Segment",
     "SegmentCreate",
+    "BatchJobCreate",
+    "BatchJobResponse",
+    "BatchJobListResponse",
+    "BatchJobCreateResponse",
+    "BatchJobStartResponse",
+    "BatchVideoResponse",
+    "BatchSettings",
+    "AddVideosRequest",
+    "BatchExportRequest",
+    "BatchExportResponse",
+    "BatchProgressEvent",
+    "UploadProgress",
 ]
