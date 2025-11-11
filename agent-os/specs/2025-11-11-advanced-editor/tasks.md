@@ -1,0 +1,1036 @@
+# Task Breakdown: Advanced Editor
+
+## Overview
+Total Tasks: 5 task groups, 100+ sub-tasks
+
+## Task List
+
+### Database Layer
+
+#### Task Group 1: Database Models and Migrations
+**Dependencies:** Video Upload (Task Group 1), User Authentication (Task Group 1)
+
+- [ ] 1.0 Complete database layer
+  - [ ] 1.1 Write 2-8 focused tests for Project model functionality
+    - Test Project model creation with required fields (user_id, name, width, height, frame_rate, duration_seconds)
+    - Test Project model validation (user_id foreign key, status enum, positive dimensions)
+    - Test Project model canvas_settings and export_settings JSONB field storage and retrieval
+    - Test Project model relationships with User and Video
+    - Test Project model timestamps (created_at, updated_at, last_rendered_at)
+    - Test Project model status transitions (draft → rendering → completed/error)
+  - [ ] 1.2 Create Project model with validations
+    - Fields: id (UUID), user_id (foreign key to users), name (string, 255 chars, required)
+    - description (text, optional), video_id (foreign key to videos, optional)
+    - width, height (integers, pixels), frame_rate (float), duration_seconds (float)
+    - background_color (string, hex color, default "#000000")
+    - canvas_settings (JSONB), export_settings (JSONB)
+    - thumbnail_url (string, S3 URL), status (enum: draft, rendering, completed, error)
+    - last_rendered_at (timestamp, nullable), render_output_url (string, S3 URL, nullable)
+    - created_at, updated_at (timestamps)
+    - Reuse pattern from: Video model in `backend/app/models/video.py`
+  - [ ] 1.3 Create migration for projects table
+    - Add indexes on user_id, status, created_at DESC for efficient queries
+    - Add status enum type (draft, rendering, completed, error)
+    - Foreign key relationships to users and videos tables
+    - JSONB columns for canvas_settings and export_settings
+    - Check constraints: width > 0, height > 0, frame_rate > 0, duration_seconds > 0
+    - Command: `alembic revision --autogenerate -m "Add Project model for multi-track editor"`
+  - [ ] 1.4 Write 2-8 focused tests for Track model functionality
+    - Test Track model creation with required fields (project_id, track_type, name, z_index)
+    - Test Track model validation (project_id foreign key, track_type enum, z_index ordering)
+    - Test Track model audio properties (volume, is_muted) validation (0.0-1.0 range)
+    - Test Track model opacity validation (0.0-1.0 range)
+    - Test Track model relationships with Project and TrackItems
+    - Test Track model cascade delete (deleting project deletes tracks)
+  - [ ] 1.5 Create Track model with validations
+    - Fields: id (UUID), project_id (foreign key to projects, cascade delete)
+    - track_type (enum: video, audio, image, text, overlay)
+    - name (string, 255 chars), z_index (integer, stacking order)
+    - is_locked, is_visible, is_muted (booleans)
+    - volume (float, 0.0-1.0, default 1.0), opacity (float, 0.0-1.0, default 1.0)
+    - blend_mode (enum: normal, multiply, screen, overlay, default normal)
+    - track_order (integer, UI order), created_at, updated_at (timestamps)
+    - Relationships: project (many-to-one), track_items (one-to-many)
+  - [ ] 1.6 Create migration for tracks table
+    - Add indexes on project_id, z_index, track_order for efficient queries
+    - Add track_type enum (video, audio, image, text, overlay)
+    - Add blend_mode enum (normal, multiply, screen, overlay)
+    - Foreign key to projects with cascade delete
+    - Check constraints: volume >= 0 AND volume <= 1, opacity >= 0 AND opacity <= 1
+    - Command: `alembic revision --autogenerate -m "Add Track model for timeline tracks"`
+  - [ ] 1.7 Write 2-8 focused tests for TrackItem model functionality
+    - Test TrackItem model creation with required fields (track_id, item_type, start_time, end_time)
+    - Test TrackItem model validation (end_time > start_time, duration calculation)
+    - Test TrackItem model source references (source_id, source_url validation)
+    - Test TrackItem model transform properties (position, scale, rotation validation)
+    - Test TrackItem model text_content and text_style JSONB for text items
+    - Test TrackItem model effects JSONB array storage and retrieval
+    - Test TrackItem model crop_settings and transform_settings JSONB
+    - Test TrackItem model relationships with Track, Video, Asset, Transitions
+  - [ ] 1.8 Create TrackItem model with validations
+    - Fields: id (UUID), track_id (foreign key to tracks, cascade delete)
+    - item_type (enum: video_clip, audio_clip, image, text, shape)
+    - source_type (enum: video, asset, text, generated)
+    - source_id (UUID, nullable), source_url (string, S3 URL, nullable)
+    - start_time, end_time, duration (floats, seconds)
+    - trim_start, trim_end (floats, seconds, default 0)
+    - position_x, position_y (floats, 0.0-1.0, default 0.0)
+    - scale_x, scale_y (floats, default 1.0), rotation (float, degrees, default 0.0)
+    - crop_settings, transform_settings (JSONB, nullable)
+    - text_content (text, nullable), text_style (JSONB, nullable)
+    - effects (JSONB array, nullable)
+    - transition_in, transition_out (UUIDs, foreign keys to transitions, nullable)
+    - created_at, updated_at (timestamps)
+  - [ ] 1.9 Create migration for track_items table
+    - Add indexes on track_id, start_time, item_type for efficient queries
+    - Add item_type enum (video_clip, audio_clip, image, text, shape)
+    - Add source_type enum (video, asset, text, generated)
+    - Foreign keys to tracks (cascade delete), transitions (nullable)
+    - Check constraints: end_time > start_time, duration = end_time - start_time
+    - JSONB columns for crop_settings, transform_settings, text_style, effects
+    - Command: `alembic revision --autogenerate -m "Add TrackItem model for timeline items"`
+  - [ ] 1.10 Write 2-8 focused tests for Asset model functionality
+    - Test Asset model creation with required fields (user_id, asset_type, name, file_url)
+    - Test Asset model validation (user_id foreign key, asset_type enum, file_size positive)
+    - Test Asset model metadata JSONB field storage and retrieval
+    - Test Asset model tags array storage and querying (GIN index)
+    - Test Asset model relationships with User
+    - Test Asset model usage_count increment functionality
+  - [ ] 1.11 Create Asset model with validations
+    - Fields: id (UUID), user_id (foreign key to users)
+    - asset_type (enum: image, audio, font, graphic, template)
+    - name (string, 255 chars, required), file_url (string, S3 URL, required)
+    - file_size (bigint, bytes), mime_type (string)
+    - width, height (integers, nullable for images)
+    - duration_seconds (float, nullable for audio)
+    - metadata (JSONB), thumbnail_url (string, S3 URL, nullable)
+    - is_public (boolean, default false), tags (string array)
+    - usage_count (integer, default 0), created_at, updated_at (timestamps)
+  - [ ] 1.12 Create migration for assets table
+    - Add indexes on user_id, asset_type, created_at DESC for efficient queries
+    - Add GIN index on tags array for fast tag-based searches
+    - Add asset_type enum (image, audio, font, graphic, template)
+    - Foreign key to users table
+    - Check constraint: file_size > 0
+    - Command: `alembic revision --autogenerate -m "Add Asset model for media library"`
+  - [ ] 1.13 Write 2-8 focused tests for Transition model functionality
+    - Test Transition model creation with required fields (name, transition_type, default_duration)
+    - Test Transition model validation (transition_type enum, default_duration positive)
+    - Test Transition model parameters JSONB field storage and retrieval
+    - Test Transition model built-in vs custom transitions (is_builtin flag)
+    - Test Transition model public/private access (is_public flag)
+  - [ ] 1.14 Create Transition model with validations
+    - Fields: id (UUID), name (string, 255 chars, required)
+    - transition_type (enum: fade, dissolve, slide, wipe, zoom, blur, custom)
+    - direction (enum: in, out, nullable for directional transitions)
+    - default_duration (float, seconds, default 0.5)
+    - parameters (JSONB), preview_url (string, S3 URL, nullable)
+    - is_builtin (boolean, default true), is_public (boolean, default true)
+    - created_at, updated_at (timestamps)
+  - [ ] 1.15 Create migration for transitions table with seed data
+    - Add indexes on transition_type, is_public for efficient queries
+    - Add transition_type enum (fade, dissolve, slide, wipe, zoom, blur, custom)
+    - Add direction enum (in, out)
+    - Check constraint: default_duration > 0
+    - Seed built-in transitions:
+      - Fade (in/out): Linear opacity change
+      - Dissolve: Cross-fade between clips
+      - Slide (left/right/up/down): Sliding motion
+      - Wipe (horizontal/vertical/diagonal): Progressive reveal
+      - Zoom (in/out): Scale transition
+      - Blur: Blur transition effect
+    - Command: `alembic revision --autogenerate -m "Add Transition model and seed built-in transitions"`
+  - [ ] 1.16 Write 2-8 focused tests for CompositionEffect model functionality
+    - Test CompositionEffect model creation with required fields (name, effect_type, parameters)
+    - Test CompositionEffect model validation (effect_type enum)
+    - Test CompositionEffect model parameters JSONB field storage and retrieval
+    - Test CompositionEffect model ffmpeg_filter validation
+    - Test CompositionEffect model built-in effects (is_builtin flag)
+  - [ ] 1.17 Create CompositionEffect model with validations
+    - Fields: id (UUID), name (string, 255 chars, required)
+    - effect_type (enum: filter, color, blur, sharpen, distort, custom)
+    - parameters (JSONB), ffmpeg_filter (string, nullable)
+    - is_builtin (boolean, default true), preview_url (string, S3 URL, nullable)
+    - created_at (timestamp)
+  - [ ] 1.18 Create migration for composition_effects table with seed data
+    - Add index on effect_type for efficient queries
+    - Add effect_type enum (filter, color, blur, sharpen, distort, custom)
+    - Seed common effects: grayscale, sepia, brightness, contrast, saturation, blur, sharpen
+    - Command: `alembic revision --autogenerate -m "Add CompositionEffect model"`
+  - [ ] 1.19 Set up all model associations and relationships
+    - Project belongs_to User, has_many Tracks, belongs_to Video (optional)
+    - Track belongs_to Project, has_many TrackItems
+    - TrackItem belongs_to Track, belongs_to Video (optional), belongs_to Asset (optional)
+    - TrackItem belongs_to Transition (transition_in, transition_out, optional)
+    - Asset belongs_to User
+    - Verify cascade delete behavior (Project → Tracks → TrackItems)
+  - [ ] 1.20 Ensure all database layer tests pass
+    - Run ONLY the tests written in 1.1, 1.4, 1.7, 1.10, 1.13, 1.16
+    - Verify all migrations run successfully
+    - Verify all indexes are created
+    - Verify all constraints work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All database model tests (written in 1.1, 1.4, 1.7, 1.10, 1.13, 1.16) pass
+- All 6 models (Project, Track, TrackItem, Asset, Transition, CompositionEffect) are created with proper validations
+- All 6 migrations run successfully and create tables with indexes and constraints
+- Built-in transitions and effects are seeded
+- All relationships and associations work correctly
+- Cascade delete behavior works as expected
+
+### Backend Services Layer
+
+#### Task Group 2: Composition, Audio, and Rendering Services
+**Dependencies:** Task Group 1, ARQ Worker setup, PyAV/FFmpeg setup
+
+- [ ] 2.0 Complete services layer
+  - [ ] 2.1 Write 2-8 focused tests for CompositionService
+    - Test create_project creates project with default tracks
+    - Test get_project fetches project with nested tracks and items
+    - Test update_project updates project settings with validation
+    - Test delete_project soft deletes and cleans up S3 files
+    - Test add_track adds track with correct z_index
+    - Test update_track updates track properties and reorders if needed
+    - Test add_track_item validates source references and timing
+    - Test validate_project checks for missing sources and errors
+  - [ ] 2.2 Create CompositionService class
+    - File: `backend/app/services/composition_service.py`
+    - Method: create_project(user_id, config) - Create project with default tracks
+    - Method: get_project(project_id, user_id) - Fetch project with nested data
+    - Method: update_project(project_id, updates, user_id) - Update project settings
+    - Method: delete_project(project_id, user_id) - Soft delete and cleanup
+    - Method: add_track(project_id, track_config, user_id) - Add track with auto z_index
+    - Method: update_track(track_id, updates, user_id) - Update track and reorder
+    - Method: delete_track(track_id, user_id) - Delete track and adjust z_index
+    - Method: add_track_item(track_id, item_config, user_id) - Add item with validation
+    - Method: update_track_item(item_id, updates, user_id) - Update item properties
+    - Method: delete_track_item(item_id, user_id) - Delete item from track
+    - Method: get_project_preview_data(project_id, time, user_id) - Get layered data at time
+    - Method: validate_project(project_id, user_id) - Validate project for rendering
+    - All methods include user ownership verification
+    - All methods include comprehensive error handling
+    - Reuse pattern from: existing service classes in `backend/app/services/`
+  - [ ] 2.3 Write 2-8 focused tests for AudioMixingService
+    - Test mix_audio_tracks combines multiple audio tracks with correct timing
+    - Test apply_audio_fade applies fade in/out effects correctly
+    - Test normalize_audio normalizes to target level
+    - Test extract_audio_from_video extracts audio with trim
+    - Test calculate_audio_levels returns accurate level measurements
+    - Test create_audio_waveform generates waveform image
+  - [ ] 2.4 Create AudioMixingService class
+    - File: `backend/app/services/audio_mixing_service.py`
+    - Method: mix_audio_tracks(project_id, output_path) - Mix all audio tracks
+      - Extract audio from all audio and video tracks
+      - Apply volume levels and timing (start_time, end_time)
+      - Use FFmpeg amix filter for mixing multiple tracks
+      - Handle fade in/out for each track
+      - Return path to mixed audio file
+    - Method: apply_audio_fade(audio_path, fade_in, fade_out, output_path)
+      - Use FFmpeg afade filter
+      - Support custom fade curves (linear, exponential)
+    - Method: normalize_audio(audio_path, target_level, output_path)
+      - Use FFmpeg loudnorm filter for normalization
+      - Target level: -16 LUFS (standard for web content)
+    - Method: extract_audio_from_video(video_path, output_path, start, duration)
+      - Extract audio track with PyAV or FFmpeg
+      - Apply trim if start/duration specified
+    - Method: calculate_audio_levels(audio_path) - Analyze audio levels
+      - Return peak, RMS, LUFS measurements
+    - Method: create_audio_waveform(audio_path, width, height) - Generate waveform
+      - Return path to waveform PNG for timeline display
+      - Cache waveforms in S3 for performance
+  - [ ] 2.5 Write 2-8 focused tests for VideoRenderingService
+    - Test render_project orchestrates full rendering workflow
+    - Test build_ffmpeg_filter_complex generates correct filter string
+    - Test render_video_layer renders individual track items
+    - Test apply_transition applies transitions between clips
+    - Test render_text_overlay generates text overlays correctly
+    - Test generate_preview_frame creates preview at specific time
+    - Test estimate_render_time calculates reasonable estimates
+  - [ ] 2.6 Create VideoRenderingService class
+    - File: `backend/app/services/video_rendering_service.py`
+    - Method: render_project(project_id, user_id, output_config) - Full render workflow
+      - Validate project first
+      - Build FFmpeg filter complex for composition
+      - Render video with all tracks, effects, transitions
+      - Mix audio tracks separately
+      - Encode final video (H.264, AAC audio)
+      - Upload to S3 and update Project model
+      - Return S3 URL of rendered video
+    - Method: build_ffmpeg_filter_complex(project) - Build filter graph
+      - Handle multiple inputs (video files, images, audio)
+      - Apply transforms (scale, position, rotation) to each layer
+      - Stack video layers by z_index using overlay filters
+      - Apply transitions using xfade filter
+      - Apply effects (color, blur, etc.)
+      - Return filter_complex string
+    - Method: render_video_layer(track_item, temp_dir) - Render individual item
+      - Handle different item types (video, image, text)
+      - Apply item transforms and effects
+      - Return path to rendered segment
+    - Method: apply_transition(clip1_path, clip2_path, transition, output_path)
+      - Use FFmpeg xfade filter for transitions
+      - Support different transition types (fade, slide, wipe, etc.)
+    - Method: render_text_overlay(text_item, duration, output_path)
+      - Use FFmpeg drawtext filter or Pillow for text rendering
+      - Apply text styling (font, size, color, alignment)
+      - Return path to text overlay video (transparent background)
+    - Method: generate_preview_frame(project_id, time, user_id)
+      - Composite all visible layers at specified time
+      - Return path to preview image (JPEG/PNG)
+      - Cache preview frames in S3 for timeline scrubbing
+    - Method: estimate_render_time(project) - Estimate rendering time
+      - Factors: duration, track count, effects, transitions, resolution
+      - Return estimated seconds
+    - Method: cancel_render(job_id) - Cancel ongoing render
+      - Clean up temp files
+      - Update project status
+  - [ ] 2.7 Ensure all services layer tests pass
+    - Run ONLY the tests written in 2.1, 2.3, 2.5
+    - Verify all service methods work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All service tests (written in 2.1, 2.3, 2.5) pass
+- CompositionService manages projects, tracks, and items correctly
+- AudioMixingService mixes audio tracks with proper timing and effects
+- VideoRenderingService builds correct FFmpeg filter complex and renders projects
+- All services include proper error handling and validation
+- All services verify user ownership before operations
+
+### Backend API and Worker Layer
+
+#### Task Group 3: API Endpoints and Background Jobs
+**Dependencies:** Task Group 2
+
+- [ ] 3.0 Complete API and worker layer
+  - [ ] 3.1 Write 2-8 focused tests for Project API endpoints
+    - Test POST /api/projects creates project with default tracks
+    - Test GET /api/projects lists user's projects with pagination
+    - Test GET /api/projects/{id} returns project with nested tracks/items
+    - Test PATCH /api/projects/{id} updates project settings
+    - Test DELETE /api/projects/{id} soft deletes project
+    - Test POST /api/projects/{id}/duplicate duplicates project
+    - Test POST /api/projects/{id}/render triggers render job
+    - Test GET /api/projects/{id}/render/progress returns progress data
+  - [ ] 3.2 Create Project API endpoints
+    - File: `backend/app/api/routes/projects.py`
+    - POST /api/projects - Create new project
+      - Body: {name, description?, video_id?, width, height, frame_rate, duration}
+      - Creates project with 1 video track and 1 audio track by default
+      - Returns: Project object with default tracks
+    - GET /api/projects - List user's projects
+      - Query params: status, limit (default 20), offset (default 0), sort
+      - Returns: {projects: Project[], total: number}
+    - GET /api/projects/{id} - Get project details
+      - Returns: Project with all tracks and items (nested structure)
+      - Include track ordering and z_index
+    - PATCH /api/projects/{id} - Update project
+      - Body: Partial project updates {name?, description?, width?, height?, ...}
+      - Validate changes (positive dimensions, valid duration)
+      - Returns: Updated Project
+    - DELETE /api/projects/{id} - Delete project
+      - Soft delete project
+      - Clean up S3 files (rendered outputs)
+      - Returns: {message: "Project deleted"}
+    - POST /api/projects/{id}/duplicate - Duplicate project
+      - Creates copy with all tracks and items
+      - Returns: New Project object
+    - POST /api/projects/{id}/render - Trigger rendering
+      - Body: {quality, format, resolution?}
+      - Enqueues render_project ARQ job
+      - Returns: {job_id: string, estimated_time: number}
+    - GET /api/projects/{id}/render/progress - Get render progress
+      - Returns: {progress: number, stage: string, status: string, estimated_remaining: number}
+    - POST /api/projects/{id}/render/cancel - Cancel render
+      - Returns: {message: "Render cancelled"}
+    - GET /api/projects/{id}/preview - Get preview frame
+      - Query param: time (seconds)
+      - Returns: Image file (JPEG) of composed frame
+      - Cache preview frames for performance
+    - GET /api/projects/{id}/validate - Validate project
+      - Returns: {valid: boolean, errors: string[], warnings: string[]}
+    - Use existing auth pattern (get_current_user dependency)
+    - Follow pattern from: existing route files in `backend/app/api/routes/`
+  - [ ] 3.3 Write 2-8 focused tests for Track API endpoints
+    - Test POST /api/projects/{project_id}/tracks adds track to project
+    - Test GET /api/tracks/{id} returns track with items
+    - Test PATCH /api/tracks/{id} updates track properties
+    - Test DELETE /api/tracks/{id} deletes track and items
+    - Test POST /api/tracks/{id}/duplicate duplicates track
+    - Test POST /api/tracks/{id}/reorder reorders track in list
+  - [ ] 3.4 Create Track API endpoints
+    - File: `backend/app/api/routes/tracks.py`
+    - POST /api/projects/{project_id}/tracks - Add track
+      - Body: {track_type, name, z_index?, volume?, opacity?}
+      - Returns: Track object
+    - GET /api/tracks/{id} - Get track details
+      - Returns: Track with all items
+    - PATCH /api/tracks/{id} - Update track
+      - Body: Partial track updates {name?, z_index?, volume?, opacity?, ...}
+      - Reorder tracks if z_index changed
+      - Returns: Updated Track
+    - DELETE /api/tracks/{id} - Delete track
+      - Deletes track and all items (cascade)
+      - Adjust z_index of remaining tracks
+      - Returns: {message: "Track deleted"}
+    - POST /api/tracks/{id}/duplicate - Duplicate track
+      - Creates copy with all items
+      - Returns: New Track object
+    - POST /api/tracks/{id}/reorder - Reorder track
+      - Body: {new_order: number}
+      - Updates track_order for this and other tracks
+      - Returns: {message: "Track reordered"}
+  - [ ] 3.5 Write 2-8 focused tests for TrackItem API endpoints
+    - Test POST /api/tracks/{track_id}/items adds item to track
+    - Test GET /api/items/{id} returns item details
+    - Test PATCH /api/items/{id} updates item properties
+    - Test DELETE /api/items/{id} deletes item
+    - Test POST /api/items/{id}/duplicate duplicates item
+    - Test POST /api/items/{id}/split splits item at time
+  - [ ] 3.6 Create TrackItem API endpoints
+    - File: `backend/app/api/routes/track_items.py`
+    - POST /api/tracks/{track_id}/items - Add item to track
+      - Body: {item_type, source_type, source_id?, source_url?, start_time, end_time, ...}
+      - Validate item fits within project duration
+      - Handle source reference (video_id, asset_id, or URL)
+      - Returns: TrackItem object
+    - GET /api/items/{id} - Get item details
+      - Returns: TrackItem object
+    - PATCH /api/items/{id} - Update item
+      - Body: Partial item updates (any TrackItem field)
+      - Validate changes (times within bounds, valid transforms)
+      - Returns: Updated TrackItem
+    - DELETE /api/items/{id} - Delete item
+      - Returns: {message: "Item deleted"}
+    - POST /api/items/{id}/duplicate - Duplicate item
+      - Creates copy on same track
+      - Returns: New TrackItem object
+    - POST /api/items/{id}/split - Split item at time
+      - Body: {split_time: number}
+      - Splits into two items at specified time
+      - Returns: {item1: TrackItem, item2: TrackItem}
+  - [ ] 3.7 Write 2-8 focused tests for Asset API endpoints
+    - Test POST /api/assets/upload uploads asset to S3 and creates record
+    - Test GET /api/assets lists user's assets with filtering
+    - Test GET /api/assets/{id} returns asset with presigned URL
+    - Test PATCH /api/assets/{id} updates asset metadata
+    - Test DELETE /api/assets/{id} deletes asset from S3 and database
+    - Test GET /api/assets/search searches assets by query and filters
+  - [ ] 3.8 Create Asset API endpoints
+    - File: `backend/app/api/routes/assets.py`
+    - POST /api/assets/upload - Upload asset
+      - Multipart form data: file, asset_type, name, tags[]
+      - Validate file type and size (max 100MB)
+      - Upload to S3 with unique key
+      - Generate thumbnail if image
+      - Create Asset record
+      - Returns: Asset object
+    - GET /api/assets - List user's assets
+      - Query params: asset_type, tags, limit (default 20), offset (default 0), search
+      - Returns: {assets: Asset[], total: number}
+    - GET /api/assets/{id} - Get asset details
+      - Generate presigned S3 URL for file access
+      - Returns: Asset object with presigned URL
+    - PATCH /api/assets/{id} - Update asset metadata
+      - Body: {name?, tags?}
+      - Returns: Updated Asset
+    - DELETE /api/assets/{id} - Delete asset
+      - Check if asset is used in any projects (warn or prevent)
+      - Delete from S3 and database
+      - Returns: {message: "Asset deleted"}
+    - GET /api/assets/search - Search assets
+      - Query params: q (query string), asset_type, tags
+      - Full-text search on name and tags
+      - Returns: {assets: Asset[], total: number}
+  - [ ] 3.9 Write 2-8 focused tests for Transition API endpoints
+    - Test GET /api/transitions lists available transitions
+    - Test GET /api/transitions/{id} returns transition with preview
+    - Test POST /api/transitions creates custom transition (future feature)
+  - [ ] 3.10 Create Transition API endpoints
+    - File: `backend/app/api/routes/transitions.py`
+    - GET /api/transitions - List available transitions
+      - Query params: transition_type, is_public
+      - Returns: {transitions: Transition[]}
+    - GET /api/transitions/{id} - Get transition details
+      - Returns: Transition object with preview URL
+    - POST /api/transitions - Create custom transition (future)
+      - Body: {name, transition_type, parameters, ffmpeg_filter?}
+      - Returns: Transition object
+  - [ ] 3.11 Create Pydantic schemas for all requests/responses
+    - File: `backend/app/schemas/advanced_editor.py`
+    - ProjectCreate, ProjectUpdate, ProjectResponse schemas
+    - TrackCreate, TrackUpdate, TrackResponse schemas
+    - TrackItemCreate, TrackItemUpdate, TrackItemResponse schemas
+    - AssetCreate, AssetUpdate, AssetResponse schemas
+    - TransitionResponse schema
+    - RenderConfig, RenderProgress, ValidationResult schemas
+    - Include all validation rules (positive numbers, valid enums, etc.)
+    - Reuse pattern from: existing schema files in `backend/app/schemas/`
+  - [ ] 3.12 Write 2-8 focused tests for render_project ARQ task
+    - Test render_project downloads sources and builds filter complex
+    - Test render_project renders video with all tracks and effects
+    - Test render_project mixes audio tracks correctly
+    - Test render_project uploads to S3 and updates Project
+    - Test render_project tracks progress in Redis
+    - Test render_project handles errors with retries
+    - Test render_project cleans up temp files on completion/failure
+  - [ ] 3.13 Create render_project ARQ task
+    - File: `backend/app/worker.py` (add to existing worker)
+    - Task function: render_project(project_id: str, user_id: str, render_config: dict)
+    - Download all source files from S3 to temp directory
+    - Validate all sources exist
+    - Build FFmpeg filter complex using VideoRenderingService
+    - Render video with progress tracking (update Redis every 5%)
+    - Mix audio tracks using AudioMixingService
+    - Encode final video (H.264, AAC) with specified quality settings
+    - Upload rendered video to S3
+    - Update Project model (status=completed, render_output_url, last_rendered_at)
+    - Send completion notification (SSE or webhook)
+    - Clean up temp files
+    - Track progress stages in Redis: progress:render:{project_id}
+      - Stages: Validating (5%), Downloading (10%), Rendering (70%), Encoding (15%), Uploading (100%)
+    - Handle errors with retry logic (max 2 retries, exponential backoff)
+    - Job timeout: 30 minutes for complex projects
+    - Register task in WorkerSettings
+  - [ ] 3.14 Write 2-8 focused tests for generate_project_thumbnail ARQ task
+    - Test generate_project_thumbnail renders frame at specified time
+    - Test generate_project_thumbnail uploads thumbnail to S3
+    - Test generate_project_thumbnail updates Project.thumbnail_url
+    - Test generate_project_thumbnail handles errors gracefully
+  - [ ] 3.15 Create generate_project_thumbnail ARQ task
+    - File: `backend/app/worker.py` (add to existing worker)
+    - Task function: generate_project_thumbnail(project_id: str, time: float = None)
+    - If time not specified, use project midpoint (duration / 2)
+    - Generate preview frame using VideoRenderingService.generate_preview_frame
+    - Upload thumbnail to S3
+    - Update Project.thumbnail_url
+    - Handle errors gracefully (don't fail if thumbnail generation fails)
+    - Register task in WorkerSettings
+  - [ ] 3.16 Implement progress tracking for renders
+    - Store progress in Redis: progress:render:{project_id}
+    - Format: {progress: number (0-100), stage: string, status: string}
+    - Update progress at key milestones during rendering
+    - Expire progress keys after 24 hours
+    - Clear progress key on completion or failure
+  - [ ] 3.17 Implement authentication/authorization for all endpoints
+    - Use existing get_current_user dependency
+    - Add permission checks (users can only access their own projects/assets)
+    - Verify project ownership before all operations
+    - Verify asset ownership before adding to projects
+  - [ ] 3.18 Ensure all API and worker tests pass
+    - Run ONLY the tests written in 3.1, 3.3, 3.5, 3.7, 3.9, 3.12, 3.14
+    - Verify all endpoints work correctly
+    - Verify ARQ tasks process correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All API and worker tests (written in 3.1, 3.3, 3.5, 3.7, 3.9, 3.12, 3.14) pass
+- All Project API endpoints work correctly (11 endpoints)
+- All Track API endpoints work correctly (6 endpoints)
+- All TrackItem API endpoints work correctly (6 endpoints)
+- All Asset API endpoints work correctly (6 endpoints)
+- All Transition API endpoints work correctly (3 endpoints)
+- render_project ARQ task processes projects successfully
+- generate_project_thumbnail ARQ task creates thumbnails
+- Progress tracking works in Redis
+- Authentication and authorization work correctly
+- All Pydantic schemas validate correctly
+
+### Frontend Components
+
+#### Task Group 4: Advanced Editor UI Components
+**Dependencies:** Task Group 3
+
+- [ ] 4.0 Complete UI components
+  - [ ] 4.1 Write 2-8 focused tests for TypeScript types
+    - Test Project interface includes all required fields
+    - Test Track interface includes all required fields
+    - Test TrackItem interface includes all required fields
+    - Test Asset interface includes all required fields
+    - Test Transition interface includes all required fields
+    - Test all enum types (TrackType, ItemType, ProjectStatus, etc.)
+  - [ ] 4.2 Create TypeScript type definitions
+    - File: `frontend/src/types/advancedEditor.ts`
+    - Project interface with all fields from spec
+    - Track interface with nested items relationship
+    - TrackItem interface with all transform properties
+    - Asset interface with metadata
+    - Transition, CompositionEffect interfaces
+    - ProjectConfig, TrackConfig, TrackItemConfig interfaces
+    - RenderConfig, RenderProgress, ValidationResult interfaces
+    - All enum types: TrackType, ItemType, SourceType, AssetType, TransitionType, EffectType, BlendMode, ProjectStatus
+    - TextStyle, CropSettings, TransformSettings interfaces
+    - Export all types and interfaces
+  - [ ] 4.3 Write 2-8 focused tests for frontend API client functions
+    - Test createProject calls POST /api/projects correctly
+    - Test getProjects fetches projects with pagination
+    - Test updateProject calls PATCH /api/projects/{id}
+    - Test renderProject calls POST /api/projects/{id}/render
+    - Test addTrack calls POST /api/projects/{project_id}/tracks
+    - Test addTrackItem calls POST /api/tracks/{track_id}/items
+    - Test uploadAsset calls POST /api/assets/upload with multipart form
+    - Test all functions handle errors correctly
+  - [ ] 4.4 Create frontend API client functions
+    - File: `frontend/src/lib/api/advancedEditor.ts`
+    - Project functions: createProject, getProjects, getProject, updateProject, deleteProject, duplicateProject
+    - Project render functions: renderProject, getRenderProgress, cancelRender
+    - Project utility functions: getProjectPreview, validateProject
+    - Track functions: addTrack, updateTrack, deleteTrack, duplicateTrack, reorderTrack
+    - TrackItem functions: addTrackItem, updateTrackItem, deleteTrackItem, duplicateTrackItem, splitTrackItem
+    - Asset functions: uploadAsset, getAssets, updateAsset, deleteAsset, searchAssets
+    - Transition functions: getTransitions
+    - All functions use apiClient with proper error handling
+    - All functions use TypeScript types from advancedEditor.ts
+    - Follow pattern from: existing API client in `frontend/src/lib/api/`
+  - [ ] 4.5 Write 2-8 focused tests for MultiTrackTimeline component
+    - Test MultiTrackTimeline renders tracks and items
+    - Test MultiTrackTimeline handles drag and drop from AssetLibrary
+    - Test MultiTrackTimeline handles item drag to reposition
+    - Test MultiTrackTimeline handles item resize to adjust duration
+    - Test MultiTrackTimeline handles playhead updates
+    - Test MultiTrackTimeline handles keyboard shortcuts (space, delete, etc.)
+    - Test MultiTrackTimeline handles multi-select and context menu
+  - [ ] 4.6 Create MultiTrackTimeline component
+    - File: `frontend/src/components/editor/MultiTrackTimeline.tsx`
+    - Client component ('use client')
+    - Props: projectId, onItemSelect, onTimeChange
+    - Display all tracks vertically stacked (video at top, audio at bottom)
+    - Each track shows TrackHeader and TimelineItems
+    - Timeline ruler with time markers (00:00, 00:01, etc.)
+    - Playhead (red line) showing current time
+    - Zoom controls (zoom in/out timeline scale)
+    - Snap to grid toggle (snap items to frame boundaries)
+    - Track height adjustable (expand/collapse)
+    - Drag and drop from AssetLibrary creates TrackItem
+    - Drag items to reposition or move between tracks
+    - Resize items to adjust duration (trim)
+    - Split items with context menu or keyboard (S key)
+    - Multi-select with Shift+click or drag box
+    - Copy/paste items (Cmd/Ctrl+C/V)
+    - Undo/redo support (Cmd/Ctrl+Z/Shift+Z)
+    - Keyboard shortcuts: Space (play/pause), Delete (delete), Arrow keys (move playhead)
+    - Context menu: Edit, Duplicate, Split, Delete, Add Transition
+    - Visual indicators: thumbnails, waveforms, transitions, selected highlight
+    - Use React-Konva for canvas-based rendering (performance)
+    - Virtualized rendering for many items
+    - Debounced updates on drag (update every 50ms)
+    - State management: React Context or Zustand
+    - Real-time sync with backend (auto-save on changes)
+    - Shadcn components: Button, Slider, ContextMenu, Tooltip
+  - [ ] 4.7 Write 2-8 focused tests for TrackHeader component
+    - Test TrackHeader renders track name and controls
+    - Test TrackHeader toggles lock/visibility/mute
+    - Test TrackHeader updates volume and opacity sliders
+    - Test TrackHeader handles track name editing
+    - Test TrackHeader shows context menu
+  - [ ] 4.8 Create TrackHeader component
+    - File: `frontend/src/components/editor/TrackHeader.tsx`
+    - Client component
+    - Props: track, onUpdate, onDelete
+    - Track name (editable on double-click)
+    - Track type icon (video, audio, image, text)
+    - Lock button (toggle is_locked)
+    - Visibility button (toggle is_visible)
+    - Mute button (toggle is_muted, audio tracks only)
+    - Volume slider (0-200%, audio tracks only)
+    - Opacity slider (0-100%, video/image tracks)
+    - Track color indicator (customizable)
+    - Context menu: Duplicate, Delete, Reorder
+    - Drag handle for reordering
+    - Shadcn components: Button, Slider, Input, ContextMenu
+  - [ ] 4.9 Write 2-8 focused tests for TimelineItem component
+    - Test TimelineItem renders at correct position and width
+    - Test TimelineItem shows thumbnail or waveform
+    - Test TimelineItem handles drag to move
+    - Test TimelineItem handles resize to adjust duration
+    - Test TimelineItem shows context menu
+    - Test TimelineItem displays selected state
+  - [ ] 4.10 Create TimelineItem component
+    - File: `frontend/src/components/editor/TimelineItem.tsx`
+    - Client component
+    - Props: item, scale, onUpdate, onDelete, onSelect
+    - Rectangle representing item on timeline
+    - Position based on start_time, width based on duration
+    - Thumbnail or waveform preview
+    - Item name overlay
+    - Trim handles (left/right edges) for adjusting start/end
+    - Drag to move item on timeline
+    - Resize handles for duration adjustment
+    - Transition indicators on edges if applied
+    - Selected state (highlighted border)
+    - Error state if source missing (red border, warning icon)
+    - Context menu: Edit, Duplicate, Split, Add Transition, Delete
+    - Tooltip with details (start, end, duration, source)
+    - Use React-Konva or styled div
+    - Smooth drag/resize with constraints (snap to grid, boundaries)
+    - Visual feedback during drag (ghost/preview)
+  - [ ] 4.11 Write 2-8 focused tests for AssetLibrary component
+    - Test AssetLibrary fetches and displays assets
+    - Test AssetLibrary filters by asset type
+    - Test AssetLibrary searches assets by name/tags
+    - Test AssetLibrary handles upload button click
+    - Test AssetLibrary allows drag to timeline
+    - Test AssetLibrary shows empty state
+  - [ ] 4.12 Create AssetLibrary component
+    - File: `frontend/src/components/editor/AssetLibrary.tsx`
+    - Client component
+    - Props: projectId, onAssetSelect
+    - Tabs for asset types: Images, Audio, Fonts, Templates, My Uploads
+    - Grid view with thumbnails
+    - Search bar (filter by name, tags)
+    - Filter by asset type
+    - Upload button (opens AssetUploadDialog)
+    - Asset cards: thumbnail, name, file size, dimensions/duration, tags, usage count
+    - Drag assets to timeline (creates TrackItem)
+    - Click asset to preview
+    - Context menu: Use in Project, Edit Details, Delete
+    - Pagination or infinite scroll
+    - Empty state: "No assets found. Upload assets to get started."
+    - Loading state: Skeleton loaders
+    - Fetch from GET /api/assets
+    - Shadcn components: Tabs, Card, Button, Input, Dialog, ContextMenu, Badge
+  - [ ] 4.13 Write 2-8 focused tests for AssetUploadDialog component
+    - Test AssetUploadDialog opens and closes
+    - Test AssetUploadDialog handles file selection
+    - Test AssetUploadDialog validates file type and size
+    - Test AssetUploadDialog uploads file and creates asset
+    - Test AssetUploadDialog shows upload progress
+    - Test AssetUploadDialog handles upload errors
+  - [ ] 4.14 Create AssetUploadDialog component
+    - File: `frontend/src/components/editor/AssetUploadDialog.tsx`
+    - Client component
+    - Props: isOpen, onClose, onUploadComplete
+    - File input or drag-and-drop zone
+    - Asset type selector (auto-detect from file type)
+    - Name input (default to filename)
+    - Tags input (comma-separated or chips)
+    - Preview uploaded file before saving
+    - Upload progress bar
+    - Multiple file upload support
+    - Validation: file type, size (max 100MB)
+    - Error handling: display upload errors
+    - Upload to POST /api/assets/upload
+    - Shadcn components: Dialog, Input, Button, Progress, Label
+  - [ ] 4.15 Write 2-8 focused tests for TransitionSelector component
+    - Test TransitionSelector fetches and displays transitions
+    - Test TransitionSelector filters by transition type
+    - Test TransitionSelector handles transition selection
+    - Test TransitionSelector adjusts duration slider
+    - Test TransitionSelector applies transition
+  - [ ] 4.16 Create TransitionSelector component
+    - File: `frontend/src/components/editor/TransitionSelector.tsx`
+    - Client component
+    - Props: itemId, position ('in' | 'out'), currentTransition, onSelect
+    - Grid of transitions with preview thumbnails
+    - Filter by transition type (fade, dissolve, slide, wipe, zoom)
+    - Preview on hover or click (animated demo)
+    - Duration slider (0.1s to 3s)
+    - Apply button
+    - Remove transition button (if already applied)
+    - Popular transitions highlighted
+    - Search by name
+    - Fetch from GET /api/transitions
+    - Apply by updating TrackItem (transition_in or transition_out)
+    - Shadcn components: Dialog, Button, Slider, Input, Card
+  - [ ] 4.17 Write 2-8 focused tests for AudioMixer component
+    - Test AudioMixer displays all audio tracks
+    - Test AudioMixer updates volume sliders
+    - Test AudioMixer toggles mute/solo
+    - Test AudioMixer adjusts fade in/out
+    - Test AudioMixer saves changes to backend
+  - [ ] 4.18 Create AudioMixer component
+    - File: `frontend/src/components/editor/AudioMixer.tsx`
+    - Client component
+    - Props: projectId
+    - List all audio tracks (audio + video with audio)
+    - Each track row: name, icon, waveform, volume slider, mute/solo, pan slider
+    - Master output controls: master volume, master waveform, normalization toggle
+    - Fade in/out controls: duration (seconds), easing function
+    - Audio effects placeholder (EQ, compression, reverb - future)
+    - Preview audio mix button
+    - Reset to default button
+    - Auto-save changes (debounced updates)
+    - Fetch from GET /api/projects/{id}
+    - Update with PATCH /api/tracks/{id}
+    - Shadcn components: Card, Slider, Button, Toggle, Separator
+  - [ ] 4.19 Write 2-8 focused tests for PropertyPanel component
+    - Test PropertyPanel displays selected item properties
+    - Test PropertyPanel updates transform properties
+    - Test PropertyPanel applies effects
+    - Test PropertyPanel sets transitions
+    - Test PropertyPanel handles text-specific properties
+  - [ ] 4.20 Create PropertyPanel component
+    - File: `frontend/src/components/editor/PropertyPanel.tsx`
+    - Client component
+    - Props: selectedItem, onUpdate
+    - Display properties of selected TrackItem
+    - Tabs: Transform, Effects, Transitions, Advanced
+    - Transform tab: position X/Y, scale X/Y, rotation, crop, flip
+    - Effects tab: add/remove effects, reorder, adjust parameters
+    - Transitions tab: transition in/out selectors, preview
+    - Advanced tab: blend mode, opacity, trim settings
+    - Text-specific properties (if text item): content, font, size, color, alignment, shadow/outline
+    - Real-time preview updates in video player
+    - Apply/Cancel or auto-save
+    - Update with PATCH /api/items/{id}
+    - Shadcn components: Tabs, Input, Slider, Button, Select, Popover, ColorPicker
+  - [ ] 4.21 Write 2-8 focused tests for CompositionPreview component
+    - Test CompositionPreview fetches and displays preview frame
+    - Test CompositionPreview handles playback controls
+    - Test CompositionPreview syncs with timeline playhead
+    - Test CompositionPreview handles scrubbing
+    - Test CompositionPreview shows loading state
+  - [ ] 4.22 Create CompositionPreview component
+    - File: `frontend/src/components/editor/CompositionPreview.tsx`
+    - Client component
+    - Props: projectId, currentTime, isPlaying, onTimeUpdate
+    - Video player showing composed output at current time
+    - Playback controls: play/pause, seek, skip forward/back
+    - Time display (current / total duration)
+    - Volume control
+    - Fullscreen button
+    - Quality selector (low, medium, high)
+    - Resolution and FPS display
+    - Loading state while rendering preview
+    - Fetch preview frame from GET /api/projects/{id}/preview?time={time}
+    - Cache preview frames for performance
+    - Sync with timeline playhead
+    - Scrubbing updates preview immediately
+    - Use Video.js or custom player
+    - Shadcn components: Button, Slider
+  - [ ] 4.23 Write 2-8 focused tests for AdvancedEditorPage component
+    - Test AdvancedEditorPage fetches project data
+    - Test AdvancedEditorPage renders all child components
+    - Test AdvancedEditorPage handles auto-save
+    - Test AdvancedEditorPage handles unsaved changes warning
+    - Test AdvancedEditorPage manages global state (selected items, playhead)
+    - Test AdvancedEditorPage shows loading and error states
+  - [ ] 4.24 Create AdvancedEditorPage component
+    - File: `frontend/src/app/editor/advanced/[projectId]/page.tsx`
+    - Layout:
+      - Top toolbar: project name, Save, Render, Share, Settings
+      - Left panel (resizable): AssetLibrary (collapsible)
+      - Center top: CompositionPreview
+      - Center bottom: MultiTrackTimeline
+      - Right panel (resizable): PropertyPanel (collapsible)
+      - Bottom: AudioMixer (expandable drawer)
+    - State management: project data, selected items, current time, playback state, undo/redo history
+    - Auto-save changes (debounced, every 5 seconds)
+    - Prompt before leaving if unsaved changes
+    - Keyboard shortcuts help dialog (? key)
+    - Loading state while fetching project
+    - Error state if project not found
+  - [ ] 4.25 Write 2-8 focused tests for ProjectCreationDialog component
+    - Test ProjectCreationDialog opens and closes
+    - Test ProjectCreationDialog validates inputs
+    - Test ProjectCreationDialog creates project
+    - Test ProjectCreationDialog handles resolution presets
+    - Test ProjectCreationDialog redirects to editor on success
+  - [ ] 4.26 Create ProjectCreationDialog component
+    - File: `frontend/src/components/editor/ProjectCreationDialog.tsx`
+    - Client component
+    - Props: isOpen, onClose, onProjectCreated
+    - Project name input (required)
+    - Description textarea (optional)
+    - Resolution presets: 1080p, 720p, 4K, Vertical (1080x1920), Custom
+    - Frame rate selector: 24, 30, 60 fps
+    - Duration input (seconds or MM:SS)
+    - Starting template: Blank, From existing video, From template
+    - Create button
+    - Cancel button
+    - Validation: name required, resolution valid, duration > 0
+    - Create with POST /api/projects
+    - Redirect to editor on success
+    - Shadcn components: Dialog, Input, Select, Button, RadioGroup, Textarea
+  - [ ] 4.27 Write 2-8 focused tests for ProjectsList component
+    - Test ProjectsList fetches and displays projects
+    - Test ProjectsList filters and sorts projects
+    - Test ProjectsList opens ProjectCreationDialog
+    - Test ProjectsList handles project actions (open, duplicate, delete)
+    - Test ProjectsList shows empty state
+  - [ ] 4.28 Create ProjectsList component
+    - File: `frontend/src/components/editor/ProjectsList.tsx`
+    - Client component
+    - Props: userId
+    - Grid or list view of projects
+    - Each project card: thumbnail, name, duration, resolution, status, last updated, actions
+    - New Project button (opens ProjectCreationDialog)
+    - Search/filter by name, status
+    - Sort by: date, name, duration
+    - Empty state: "No projects yet. Create your first project!"
+    - Loading state: skeleton loaders
+    - Fetch from GET /api/projects
+    - Shadcn components: Card, Button, Input, Select, ContextMenu
+  - [ ] 4.29 Write 2-8 focused tests for RenderDialog component
+    - Test RenderDialog opens and closes
+    - Test RenderDialog selects quality presets
+    - Test RenderDialog triggers render job
+    - Test RenderDialog polls render progress
+    - Test RenderDialog handles render completion
+    - Test RenderDialog handles render errors
+  - [ ] 4.30 Create RenderDialog component
+    - File: `frontend/src/components/editor/RenderDialog.tsx`
+    - Client component
+    - Props: projectId, isOpen, onClose
+    - Quality presets: Low (720p, 2 Mbps), Medium (1080p, 5 Mbps), High (1080p, 10 Mbps), Max (4K, 20 Mbps), Custom
+    - Format selector: MP4, MOV, WebM
+    - Resolution override (optional)
+    - Advanced settings (expandable): codec, bitrate, audio codec, audio bitrate
+    - Estimated file size display
+    - Estimated render time display
+    - Render button
+    - Cancel button
+    - Progress display: progress bar, current stage, time remaining, cancel render button
+    - Success state: download button, preview, share options
+    - Trigger with POST /api/projects/{id}/render
+    - Poll progress with GET /api/projects/{id}/render/progress
+    - Shadcn components: Dialog, Select, Button, Progress, Slider, Accordion
+  - [ ] 4.31 Ensure all UI component tests pass
+    - Run ONLY the tests written in 4.1, 4.3, 4.5, 4.7, 4.9, 4.11, 4.13, 4.15, 4.17, 4.19, 4.21, 4.23, 4.25, 4.27, 4.29
+    - Verify all components render correctly
+    - Verify all interactions work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All UI component tests (written in 4.1, 4.3, 4.5, 4.7, 4.9, 4.11, 4.13, 4.15, 4.17, 4.19, 4.21, 4.23, 4.25, 4.27, 4.29) pass
+- All TypeScript types are defined correctly
+- All frontend API client functions work correctly
+- MultiTrackTimeline renders tracks and supports all interactions
+- All child components (TrackHeader, TimelineItem, etc.) work correctly
+- AssetLibrary displays assets and supports upload/drag-drop
+- AudioMixer controls all audio properties
+- PropertyPanel edits item properties with real-time preview
+- CompositionPreview displays composed output
+- AdvancedEditorPage integrates all components with proper layout
+- ProjectCreationDialog creates projects successfully
+- ProjectsList displays and manages projects
+- RenderDialog triggers and monitors renders
+- All components use Shadcn UI components
+- All components follow design system
+
+### Integration & Testing
+
+#### Task Group 5: Integration Testing and Quality Assurance
+**Dependencies:** Task Groups 1-4
+
+- [ ] 5.0 Complete integration testing
+  - [ ] 5.1 Review all tests from Task Groups 1-4
+    - Review database layer tests (Task Group 1)
+    - Review services layer tests (Task Group 2)
+    - Review API and worker tests (Task Group 3)
+    - Review UI component tests (Task Group 4)
+  - [ ] 5.2 Analyze test coverage gaps
+    - Identify missing edge cases for all layers
+    - Identify missing integration tests (full workflows)
+    - Identify missing error handling tests
+    - Check coverage for all API endpoints
+    - Check coverage for all UI components
+    - Check coverage for video rendering workflows
+    - Check coverage for audio mixing workflows
+  - [ ] 5.3 Write up to 20 additional strategic tests
+    - Integration test: Create project → Add tracks → Add items → Render → Download
+    - Integration test: Upload asset → Add to timeline → Apply transforms → Render
+    - Integration test: Multi-track video composition with overlays
+    - Integration test: Audio mixing with background music and fade effects
+    - Integration test: Apply transitions between video clips
+    - Integration test: Text overlay with custom styling
+    - Integration test: Preview frame generation at multiple times
+    - Error handling test: Render with missing source files
+    - Error handling test: Invalid transform values
+    - Error handling test: Exceeded file size limits
+    - Edge case test: Project with 50+ items on timeline
+    - Edge case test: Very long video (60+ minutes)
+    - Edge case test: Empty project rendering
+    - Performance test: Timeline with 100+ items
+    - Performance test: Concurrent renders from multiple users
+    - Performance test: Preview frame generation speed
+    - Accuracy test: Rendered output matches preview
+    - Accuracy test: Audio mix levels match settings
+    - Accuracy test: Text overlays render with correct fonts
+    - E2E test: Full workflow from project creation to render download
+  - [ ] 5.4 Run all Advanced Editor feature tests
+    - Run all database layer tests (Task Group 1)
+    - Run all services tests (Task Group 2)
+    - Run all API and worker tests (Task Group 3)
+    - Run all UI component tests (Task Group 4)
+    - Run all integration tests (Task Group 5)
+    - Verify all tests pass
+    - Generate coverage report (target: >85%)
+    - Do NOT run the entire test suite if it includes unrelated features
+  - [ ] 5.5 Perform manual testing
+    - Test full workflow: create project, add tracks, add items, render
+    - Test timeline interactions: drag, resize, split, reorder
+    - Test asset management: upload, browse, add to timeline
+    - Test audio mixing: adjust volume, mute, fade in/out
+    - Test property editing: transforms, effects, transitions
+    - Test preview: scrubbing, playback, quality selection
+    - Test render: quality presets, progress tracking, download
+    - Test error scenarios: missing files, invalid inputs, network errors
+    - Test performance: timeline with many items, large projects
+    - Test keyboard shortcuts and accessibility
+    - Test on different browsers (Chrome, Firefox, Safari)
+    - Test responsive layout (different screen sizes)
+  - [ ] 5.6 Fix bugs and address issues
+    - Fix any failing tests
+    - Fix any bugs found during manual testing
+    - Improve error messages and user feedback
+    - Optimize performance bottlenecks
+    - Address accessibility issues
+  - [ ] 5.7 Create test documentation
+    - Document test coverage for Advanced Editor feature
+    - Document test setup instructions
+    - Document manual testing checklist
+    - Document known issues and limitations
+  - [ ] 5.8 Verify success criteria
+    - Users can create multi-track projects with 5+ tracks
+    - Rendering completes in <5 minutes for 5-minute project with 10 tracks (1080p)
+    - Timeline supports 100+ items without performance degradation
+    - Preview frames generate in <2 seconds
+    - Transitions work smoothly between all clip types
+    - Audio mixing produces clean output with proper levels
+    - Text overlays render with correct fonts and styling
+    - Rendered output matches preview exactly
+    - UI is intuitive (users can create project within 10 minutes)
+    - No data loss (auto-save works reliably)
+    - Test coverage >85% for Advanced Editor code
+    - Error rate <2% for renders
+
+**Acceptance Criteria:**
+- All tests from Task Groups 1-4 pass
+- Additional strategic tests are written and pass (20 tests)
+- Test coverage >85% for Advanced Editor feature
+- No critical bugs or issues remain
+- All success criteria are met
+- Manual testing confirms feature works as expected
+- Test documentation is complete
+
+## Execution Order
+1. Database Layer (Task Group 1) - 20 tasks
+2. Backend Services Layer (Task Group 2) - 7 tasks
+3. Backend API and Worker Layer (Task Group 3) - 18 tasks
+4. Frontend Components (Task Group 4) - 31 tasks
+5. Integration & Testing (Task Group 5) - 8 tasks
+
+## Total Task Count
+- Task Group 1: 20 tasks
+- Task Group 2: 7 tasks
+- Task Group 3: 18 tasks
+- Task Group 4: 31 tasks
+- Task Group 5: 8 tasks
+- **Total: 84 tasks**
+
+## Notes
+- Each task group has dependencies on previous groups
+- Tests are written BEFORE implementation (TDD approach)
+- Tests are run incrementally (feature-specific only, not full suite)
+- Auto-save and progress tracking are critical for UX
+- Performance optimization is essential for timeline with many items
+- FFmpeg filter complex building is the most complex part of rendering
+- Preview frame generation must be fast for good scrubbing experience
+- Audio mixing requires careful timing and level management
+- All components must follow Shadcn UI design system
+- All API endpoints must include proper authentication/authorization
+- All operations must verify user ownership
+- Test coverage target: >85%

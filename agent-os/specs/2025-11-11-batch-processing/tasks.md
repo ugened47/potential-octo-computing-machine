@@ -1,0 +1,755 @@
+# Task Breakdown: Batch Processing
+
+## Overview
+Total Tasks: 5 task groups, 45+ sub-tasks
+
+## Task List
+
+### Database Layer
+
+#### Task Group 1: BatchJob and BatchVideo Models and Migrations
+**Dependencies:** Video Upload (Task Group 1), User Authentication
+
+- [ ] 1.0 Complete database layer
+  - [ ] 1.1 Write 2-8 focused tests for BatchJob model functionality
+    - Test BatchJob model creation with required fields (user_id, name, settings, status)
+    - Test BatchJob model validation (user_id foreign key, status enum, priority range)
+    - Test BatchJob model settings JSONB field storage and retrieval
+    - Test BatchJob model progress metrics (total_videos, completed_videos, failed_videos, cancelled_videos)
+    - Test BatchJob model status transitions (pending → processing → completed/failed/cancelled)
+    - Test BatchJob model relationships with User and BatchVideo
+    - Test BatchJob model timestamps (created_at, started_at, completed_at, updated_at)
+    - Test BatchJob model priority validation (0-10 range)
+  - [ ] 1.2 Create BatchJob model with validations
+    - Fields: id (UUID), user_id (foreign key to users), name (string, max 100 chars), description (text, nullable)
+    - settings (JSONB storing: transcribe, remove_silence, detect_highlights, silence_threshold, highlight_sensitivity, export_format, export_quality)
+    - status enum ('pending', 'processing', 'paused', 'completed', 'failed', 'cancelled')
+    - Progress metrics: total_videos (integer), completed_videos (integer, default 0), failed_videos (integer, default 0), cancelled_videos (integer, default 0)
+    - Statistics: total_duration_seconds (float, default 0), processed_duration_seconds (float, default 0), estimated_time_remaining (integer, nullable)
+    - priority (integer, 0-10, default 5), timestamps (created_at, started_at, completed_at, updated_at)
+    - Reuse pattern from: Video model in `backend/app/models/video.py`
+  - [ ] 1.3 Write 2-8 focused tests for BatchVideo model functionality
+    - Test BatchVideo model creation with required fields (batch_job_id, video_id, position)
+    - Test BatchVideo model validation (batch_job_id and video_id foreign keys, status enum)
+    - Test BatchVideo model unique constraint on (batch_job_id, video_id)
+    - Test BatchVideo model progress tracking (progress_percentage, current_stage)
+    - Test BatchVideo model retry logic (retry_count, max_retries)
+    - Test BatchVideo model error tracking (error_message field)
+    - Test BatchVideo model processing_result JSONB field storage
+    - Test BatchVideo model relationships with BatchJob and Video
+  - [ ] 1.4 Create BatchVideo model with validations
+    - Fields: id (UUID), batch_job_id (foreign key to batch_jobs), video_id (foreign key to videos), position (integer)
+    - status enum ('pending', 'uploading', 'processing', 'completed', 'failed', 'cancelled')
+    - Progress: progress_percentage (integer, 0-100, default 0), current_stage (string: 'uploading', 'transcribing', 'removing_silence', 'detecting_highlights', 'exporting')
+    - Error tracking: error_message (text, nullable), retry_count (integer, default 0), max_retries (integer, default 3)
+    - Results: processing_result (JSONB, nullable), output_video_url (string, nullable)
+    - Timestamps: created_at, started_at (nullable), completed_at (nullable), updated_at
+    - Unique constraint on (batch_job_id, video_id)
+  - [ ] 1.5 Create migration for batch_jobs table
+    - Add all BatchJob fields with proper types and constraints
+    - Add index on user_id for user's batch jobs lookup
+    - Add index on status for filtering by status
+    - Add composite index on (created_at DESC) for recent batches
+    - Add composite index on (priority DESC, created_at DESC) for queue ordering
+    - Foreign key relationship to users table
+    - Add status enum type with all values
+  - [ ] 1.6 Create migration for batch_videos table
+    - Add all BatchVideo fields with proper types and constraints
+    - Add index on batch_job_id for batch's videos lookup
+    - Add index on video_id for video's batch lookup
+    - Add composite index on (batch_job_id, position) for ordered video lists
+    - Add index on status for filtering
+    - Foreign key relationships to batch_jobs and videos tables
+    - Add status enum type with all values
+    - Add unique constraint on (batch_job_id, video_id)
+  - [ ] 1.7 Set up associations
+    - BatchJob belongs_to User (user_id foreign key)
+    - User has_many BatchJobs (relationship defined)
+    - BatchJob has_many BatchVideos (relationship defined)
+    - BatchVideo belongs_to BatchJob (batch_job_id foreign key)
+    - BatchVideo belongs_to Video (video_id foreign key)
+    - Video has_many BatchVideos (relationship defined)
+  - [ ] 1.8 Ensure database layer tests pass
+    - Run ONLY the tests written in 1.1 and 1.3
+    - Verify migrations run successfully
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 1.1 and 1.3 pass
+- BatchJob and BatchVideo models pass validation tests
+- Migrations run successfully
+- All indexes are created correctly
+- Associations work correctly
+- Unique constraint prevents duplicate videos in same batch
+
+### Backend Services Layer
+
+#### Task Group 2: Batch Upload, Processing, and Queue Management Services
+**Dependencies:** Task Group 1, ARQ Worker setup, S3 configuration
+
+- [ ] 2.0 Complete services layer
+  - [ ] 2.1 Write 2-8 focused tests for batch upload service
+    - Test multi-file presigned URL generation (5-50 videos)
+    - Test upload progress tracking for multiple files
+    - Test file validation (format, size, count limits)
+    - Test BatchJob and BatchVideo record creation
+    - Test user quota enforcement (free: 3, creator: 20, pro: 50)
+    - Test resumable upload handling for large files
+    - Test upload failure and retry logic
+    - Test concurrent upload coordination
+  - [ ] 2.2 Create batch upload service
+    - Function: create_batch_upload(user_id, video_count, settings) → returns {batch_job_id, upload_urls[]}
+    - Generate presigned S3 URLs for each video in parallel (batch operation)
+    - Support 5-50 videos per batch based on user tier
+    - Validate file formats (MP4, MOV, AVI, WebM) and sizes (max 2GB per file)
+    - Create BatchJob record with user settings
+    - Create placeholder Video records for each upload slot
+    - Create BatchVideo records linking batch to videos
+    - Support multipart upload for large files (>100MB)
+    - Calculate total batch size and duration estimates
+    - Enforce user quota limits based on tier
+    - Handle presigned URL expiration (15 minutes)
+    - Reuse pattern from: `backend/app/services/upload.py` (if exists)
+  - [ ] 2.3 Write 2-8 focused tests for batch processing service
+    - Test sequential video processing with shared settings
+    - Test progress tracking and counter updates
+    - Test individual video failure handling (continue batch)
+    - Test estimated time remaining calculation
+    - Test pause functionality (save state to Redis)
+    - Test resume functionality (restore state from Redis)
+    - Test cancellation with cleanup
+    - Test automatic retry with exponential backoff
+  - [ ] 2.4 Create batch processing service
+    - Function: process_batch(batch_job_id, concurrency=1) → orchestrates all videos
+    - Apply BatchJob settings to each video: transcription, silence removal, highlight detection, export settings
+    - Process videos sequentially or with limited concurrency (1-5 based on tier)
+    - Track progress for each video: update BatchVideo.status, BatchVideo.progress_percentage
+    - Update BatchJob counters: completed_videos, failed_videos in real-time
+    - Calculate estimated_time_remaining based on average processing time per video
+    - Handle individual video failures without stopping entire batch
+    - Store processing results in BatchVideo.processing_result JSONB
+    - Support pause: save current state to Redis, stop processing new videos
+    - Support resume: restore state from Redis, continue from last video
+    - Support cancel: stop all processing, clean up partial results, update statuses
+    - Retry failed videos with exponential backoff (up to max_retries)
+    - Mark batch as 'completed' when all videos processed (including failed ones)
+    - Generate batch summary report with statistics
+    - Reuse pattern from: `backend/app/services/video_processing.py` (if exists)
+  - [ ] 2.5 Write 2-8 focused tests for batch queue management
+    - Test job enqueueing with priority ordering
+    - Test fair scheduling (round-robin across users)
+    - Test concurrency limit enforcement
+    - Test job state persistence in Redis
+    - Test worker failure recovery
+    - Test timeout handling for long batches
+    - Test progress event emission
+    - Test retry mechanism for failed videos
+  - [ ] 2.6 Create batch queue management service
+    - ARQ task: process_batch_job(batch_job_id: str, concurrency: int = 1)
+    - Enqueue batch jobs with priority based on BatchJob.priority and user tier
+    - Fair scheduling: round-robin across users to prevent queue hogging
+    - Track active batch jobs in Redis (key: active_batch_jobs, value: set of batch_job_ids)
+    - Prevent exceeding concurrency limits (check active jobs before starting)
+    - Store job state in Redis (key: batch_state:{batch_job_id}, value: {current_video_index, status})
+    - Job timeout: 6 hours for large batches (configurable, raise exception on timeout)
+    - Emit real-time progress events via Redis pub/sub or direct updates
+    - Handle worker failures: job continues on another worker using Redis state
+    - Retry mechanism: exponential backoff for failed videos (1min, 5min, 15min)
+    - Cleanup: remove job from active set on completion/failure/cancellation
+    - Register task in worker.py WorkerSettings
+  - [ ] 2.7 Write 2-8 focused tests for batch export service
+    - Test ZIP export with multiple videos
+    - Test merged video export (FFmpeg concatenation)
+    - Test playlist (M3U8) generation
+    - Test parallel download from S3
+    - Test export progress tracking
+    - Test export caching (24 hours)
+    - Test cleanup of temporary files
+    - Test presigned URL generation for downloads
+  - [ ] 2.8 Create batch export service
+    - Function: export_batch(batch_job_id, format, options) → returns {export_id, status}
+    - Support export formats: 'zip' (individual files), 'merged' (single video), 'playlist' (M3U8)
+    - For ZIP export:
+      - Collect all BatchVideo.output_video_url from completed videos
+      - Download videos from S3 in parallel (5 concurrent downloads, use asyncio)
+      - Create ZIP archive with numbered filenames (001_original_name.mp4, etc.)
+      - Upload ZIP to S3 with expiring presigned URL (24 hours)
+      - Track progress: update export progress in Redis
+    - For merged video export:
+      - Concatenate videos in position order using FFmpeg concat demuxer
+      - Apply consistent encoding settings from BatchJob.settings
+      - Upload merged video to S3
+    - For playlist export:
+      - Generate M3U8 playlist file with all video URLs
+      - Include metadata: #EXTINF with durations and titles
+      - Upload playlist to S3
+    - Cache export results for 24 hours in Redis (key: batch_export:{batch_job_id}:{format})
+    - Clean up temporary files after upload (delete local downloads and archives)
+    - Support options: include_failed (boolean), custom_naming (string pattern)
+    - Return export_id for status tracking
+    - Reuse pattern from: `backend/app/services/export.py` (if exists)
+  - [ ] 2.9 Ensure services layer tests pass
+    - Run ONLY the tests written in 2.1, 2.3, 2.5, 2.7
+    - Verify all services work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 2.1, 2.3, 2.5, 2.7 pass
+- Batch upload service generates presigned URLs and creates records
+- Batch processing service orchestrates video processing with shared settings
+- Queue management service handles job scheduling and state persistence
+- Export service generates ZIP, merged video, or playlist exports
+- All services handle errors gracefully with retries
+
+### Backend API Layer
+
+#### Task Group 3: Batch Processing API Endpoints and Worker Tasks
+**Dependencies:** Task Group 2
+
+- [ ] 3.0 Complete API layer
+  - [ ] 3.1 Write 2-8 focused tests for batch API endpoints
+    - Test POST /api/batch-jobs creates batch with settings and returns upload URLs
+    - Test POST /api/batch-jobs validates user quota limits
+    - Test POST /api/batch-jobs/{id}/videos adds videos to existing batch
+    - Test POST /api/batch-jobs/{id}/start starts batch processing
+    - Test POST /api/batch-jobs/{id}/start prevents duplicate starts
+    - Test GET /api/batch-jobs lists user's batches with pagination
+    - Test GET /api/batch-jobs/{id} returns batch details with all videos
+    - Test POST /api/batch-jobs/{id}/pause pauses processing
+    - Test POST /api/batch-jobs/{id}/resume resumes processing
+    - Test POST /api/batch-jobs/{id}/cancel cancels batch
+    - Test POST /api/batch-jobs/{id}/retry-failed retries failed videos
+    - Test DELETE /api/batch-jobs/{id} deletes batch
+    - Test GET /api/batch-jobs/{id}/progress streams SSE progress events
+    - Test POST /api/batch-jobs/{id}/export generates export
+    - Test GET /api/batch-jobs/{id}/export/{export_id} returns export status
+  - [ ] 3.2 Create Pydantic schemas for request/response validation
+    - BatchJobCreate schema (name, description, settings, video_count)
+    - BatchSettings schema (transcribe, remove_silence, detect_highlights, silence_threshold, highlight_sensitivity, export_format, export_quality, language, keywords)
+    - BatchJobResponse schema (id, user_id, name, description, settings, status, progress metrics, statistics, timestamps)
+    - BatchVideoResponse schema (id, batch_job_id, video_id, position, status, progress, current_stage, error_message, retry_count, output_video_url, timestamps)
+    - BatchJobStatus enum ('pending', 'processing', 'paused', 'completed', 'failed', 'cancelled')
+    - BatchVideoStatus enum ('pending', 'uploading', 'processing', 'completed', 'failed', 'cancelled')
+    - ProcessingStage enum ('uploading', 'transcribing', 'removing_silence', 'detecting_highlights', 'exporting')
+    - BatchExportRequest schema (format, include_failed, custom_naming)
+    - BatchExportResponse schema (export_id, status, progress, download_url, expires_at)
+    - AddVideosRequest schema (video_ids: List[str])
+    - BatchProgressEvent schema (type, batch_id, video_id, progress, current_stage, message)
+    - Create file: `backend/app/schemas/batch.py`
+  - [ ] 3.3 Implement batch job management endpoints
+    - POST /api/batch-jobs: Create new batch job
+      - Body: BatchJobCreate (name, description, settings, video_count)
+      - Validate settings and user quota (call upload service)
+      - Returns {batch_job: BatchJobResponse, upload_urls: List[str]}
+      - Dependency: get_current_user
+    - POST /api/batch-jobs/{id}/videos: Add videos to existing batch
+      - Body: AddVideosRequest (video_ids)
+      - Validate batch is in 'pending' status (not started)
+      - Update total_videos count
+      - Returns updated BatchJobResponse
+      - Dependency: get_current_user, verify ownership
+    - POST /api/batch-jobs/{id}/start: Start processing batch
+      - Validate all videos are uploaded (check Video.status)
+      - Prevent starting if already processing/completed
+      - Enqueue ARQ job: process_batch_job.delay(batch_job_id)
+      - Update status to 'processing', set started_at timestamp
+      - Returns {job_id: str, batch_job: BatchJobResponse}
+      - Dependency: get_current_user, verify ownership
+    - Create file: `backend/app/api/routes/batch.py`
+  - [ ] 3.4 Implement batch job query endpoints
+    - GET /api/batch-jobs: List all batch jobs for user
+      - Query params: status (optional), limit (default 20), offset (default 0), sort (default 'created_at')
+      - Filter by user_id from current user
+      - Optional status filter
+      - Pagination with limit/offset
+      - Sort by created_at, priority, or status
+      - Returns {batch_jobs: List[BatchJobResponse], total: int, limit: int, offset: int}
+      - Dependency: get_current_user
+    - GET /api/batch-jobs/{id}: Get batch job details
+      - Fetch BatchJob with all BatchVideo records (use eager loading)
+      - Calculate progress_percentage: (completed_videos + failed_videos) / total_videos * 100
+      - Include real-time estimated_time_remaining from Redis if available
+      - Returns BatchJobResponse with videos: List[BatchVideoResponse]
+      - Dependency: get_current_user, verify ownership (404 if not owned)
+  - [ ] 3.5 Implement batch job control endpoints
+    - POST /api/batch-jobs/{id}/pause: Pause batch processing
+      - Validate batch is in 'processing' status
+      - Set Redis flag: batch_paused:{batch_job_id} = true
+      - Update status to 'paused'
+      - Worker will check this flag and stop processing new videos
+      - Returns updated BatchJobResponse
+      - Dependency: get_current_user, verify ownership
+    - POST /api/batch-jobs/{id}/resume: Resume batch processing
+      - Validate batch is in 'paused' status
+      - Remove Redis flag: batch_paused:{batch_job_id}
+      - Update status to 'processing'
+      - Re-enqueue ARQ job if needed: process_batch_job.delay(batch_job_id)
+      - Returns updated BatchJobResponse
+      - Dependency: get_current_user, verify ownership
+    - POST /api/batch-jobs/{id}/cancel: Cancel batch processing
+      - Set Redis flag: batch_cancelled:{batch_job_id} = true
+      - Update status to 'cancelled'
+      - Update all pending/processing BatchVideos to 'cancelled'
+      - Clean up partial results in S3 (optional, based on settings)
+      - Worker will check this flag and stop immediately
+      - Returns updated BatchJobResponse
+      - Dependency: get_current_user, verify ownership
+    - POST /api/batch-jobs/{id}/retry-failed: Retry all failed videos
+      - Find all BatchVideos with status 'failed'
+      - Reset status to 'pending', increment retry_count
+      - Validate retry_count < max_retries
+      - Update BatchJob status to 'processing' if paused/failed
+      - Re-enqueue processing job
+      - Returns updated BatchJobResponse with retry count
+      - Dependency: get_current_user, verify ownership
+    - DELETE /api/batch-jobs/{id}: Delete batch job
+      - Validate batch is in 'completed', 'failed', or 'cancelled' status
+      - Soft delete: set deleted_at timestamp (or hard delete based on config)
+      - Clean up associated S3 files (videos, exports)
+      - Delete BatchVideo records (cascade)
+      - Returns 204 No Content
+      - Dependency: get_current_user, verify ownership
+  - [ ] 3.6 Implement batch progress and export endpoints
+    - GET /api/batch-jobs/{id}/progress: Get real-time progress (SSE endpoint)
+      - Use EventSourceResponse from sse_starlette
+      - Subscribe to Redis pub/sub channel: batch_progress:{batch_job_id}
+      - Stream progress events: {type: 'progress', batch_id, video_id, progress, current_stage, message}
+      - Send heartbeat every 15 seconds to keep connection alive
+      - Close connection when batch completes or client disconnects
+      - Events include: video_started, video_progress, video_completed, video_failed, batch_completed
+      - Dependency: get_current_user, verify ownership
+    - POST /api/batch-jobs/{id}/export: Generate batch export
+      - Body: BatchExportRequest (format: 'zip'|'merged'|'playlist', include_failed, custom_naming)
+      - Validate batch is in 'completed' status
+      - Check cache: if export exists and not expired, return existing
+      - Enqueue export job: export_batch.delay(batch_job_id, format, options)
+      - Create export record with status 'pending'
+      - Returns {export_job_id: str, status: 'pending'}
+      - Dependency: get_current_user, verify ownership
+    - GET /api/batch-jobs/{id}/export/{export_id}: Get export status and download URL
+      - Fetch export record by export_id
+      - If status is 'completed', generate presigned S3 URL (24 hour expiration)
+      - Returns {status: str, progress: int, download_url: str|null, file_size: int|null, expires_at: datetime|null}
+      - Dependency: get_current_user, verify ownership
+  - [ ] 3.7 Implement authentication/authorization
+    - Use existing auth pattern (get_current_user dependency)
+    - Add permission checks: users can only access their own batch jobs
+    - Helper function: verify_batch_ownership(batch_job_id, user_id) → raises 404 if not owned
+    - Rate limiting: 5 batch job creations per hour for free tier
+    - Quota checks: validate user tier allows requested batch size
+  - [ ] 3.8 Implement error handling and response formatting
+    - Handle BatchJobNotFound → 404 with message "Batch job not found"
+    - Handle QuotaExceeded → 403 with message "Batch size exceeds your plan limit"
+    - Handle InvalidStatus → 400 with message "Batch is already processing"
+    - Handle VideoNotUploaded → 400 with message "All videos must be uploaded before starting"
+    - Handle all exceptions with proper HTTP status codes
+    - Log errors for debugging
+    - Return consistent error response format: {error: str, detail: str}
+  - [ ] 3.9 Ensure API layer tests pass
+    - Run ONLY the tests written in 3.1
+    - Verify all endpoints work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 3.1 pass
+- All API endpoints work correctly with proper validation
+- Batch job creation generates upload URLs
+- Batch processing can be started, paused, resumed, cancelled
+- Real-time progress streaming works via SSE
+- Export endpoints generate ZIP, merged, or playlist exports
+- Authentication and authorization work correctly
+- Error handling provides clear, actionable messages
+
+### Frontend Components
+
+#### Task Group 4: Batch Upload, Progress, and Management UI
+**Dependencies:** Task Group 3
+
+- [ ] 4.0 Complete UI components
+  - [ ] 4.1 Write 2-8 focused tests for batch components
+    - Test BatchUploadModal file selection and validation
+    - Test BatchUploadModal settings form updates
+    - Test BatchUploadModal upload progress tracking
+    - Test BatchJobsList fetches and displays batches
+    - Test BatchJobsList filtering and sorting
+    - Test BatchJobDetails displays batch info and videos
+    - Test BatchJobDetails real-time progress updates
+    - Test BatchProgressPanel SSE subscription and live updates
+    - Test BatchVideoRow displays video status and actions
+    - Test BatchExportDialog export configuration and download
+  - [ ] 4.2 Create TypeScript type definitions
+    - Define BatchJob interface (id, user_id, name, description, settings, status, progress metrics, statistics, timestamps)
+    - Define BatchVideo interface (id, batch_job_id, video_id, position, status, progress_percentage, current_stage, error_message, retry_count, max_retries, processing_result, output_video_url, timestamps)
+    - Define BatchSettings interface (transcribe, remove_silence, detect_highlights, silence_threshold, highlight_sensitivity, export_format, export_quality, language, keywords)
+    - Define BatchJobStatus type ('pending' | 'processing' | 'paused' | 'completed' | 'failed' | 'cancelled')
+    - Define BatchVideoStatus type ('pending' | 'uploading' | 'processing' | 'completed' | 'failed' | 'cancelled')
+    - Define ProcessingStage type ('uploading' | 'transcribing' | 'removing_silence' | 'detecting_highlights' | 'exporting')
+    - Define BatchExport interface (id, batch_job_id, format, status, progress, download_url, file_size, expires_at, created_at)
+    - Define BatchExportFormat type ('zip' | 'merged' | 'playlist')
+    - Define BatchProgress interface (batch_job_id, progress_percentage, current_video_id, current_video_name, current_stage, completed_count, failed_count, pending_count, estimated_time_remaining)
+    - Define UploadProgress interface (file_index, file_name, progress, status, error)
+    - Create file: `frontend/src/types/batch.ts`
+  - [ ] 4.3 Create frontend API client functions
+    - createBatchJob(data): Creates batch job, returns Promise<{batch_job: BatchJob, upload_urls: string[]}>
+    - addVideosToBatch(batchJobId, videoIds): Adds videos, returns Promise<BatchJob>
+    - startBatchProcessing(batchJobId): Starts processing, returns Promise<{job_id: string}>
+    - getBatchJobs(params): Fetches batches, returns Promise<{batch_jobs: BatchJob[], total: number}>
+    - getBatchJob(batchJobId): Fetches batch details, returns Promise<BatchJob>
+    - pauseBatchJob(batchJobId): Pauses batch, returns Promise<BatchJob>
+    - resumeBatchJob(batchJobId): Resumes batch, returns Promise<BatchJob>
+    - cancelBatchJob(batchJobId): Cancels batch, returns Promise<BatchJob>
+    - retryFailedVideos(batchJobId): Retries failed videos, returns Promise<BatchJob>
+    - deleteBatchJob(batchJobId): Deletes batch, returns Promise<void>
+    - subscribeToBatchProgress(batchJobId, callback): Subscribe to SSE, returns unsubscribe function
+    - exportBatch(batchJobId, config): Generates export, returns Promise<{export_job_id: string}>
+    - getExportStatus(batchJobId, exportId): Gets export status, returns Promise<BatchExport>
+    - uploadBatchVideos(batchJobId, files, onProgress): Uploads files, returns Promise<{uploaded_videos: Video[]}>
+    - All functions use apiClient with proper error handling and TypeScript types
+    - Create or update: `frontend/src/lib/api/batch.ts`
+  - [ ] 4.4 Create BatchUploadModal component
+    - Client component ('use client') for multi-file upload interface
+    - Props: onComplete (function), defaultSettings (BatchSettings, optional), isOpen (boolean), onClose (function)
+    - State: selectedFiles (File[]), batchName (string), description (string), settings (BatchSettings), uploadProgress (UploadProgress[]), isUploading (boolean), error (string)
+    - File selection: Drag-and-drop zone using react-dropzone, supports multiple files
+    - File list display: Table showing filename, size, duration estimate, remove button
+    - Settings panel sections:
+      - Batch name input (required, max 100 chars)
+      - Description textarea (optional)
+      - Processing settings checkboxes: Transcribe, Remove Silence, Detect Highlights
+      - Advanced settings collapse (Collapsible component):
+        - Silence threshold slider (-60dB to -20dB) with value display
+        - Highlight sensitivity radio group (low, medium, high)
+        - Export format select (MP4, MOV, WebM)
+        - Export quality select (720p, 1080p, 4K)
+    - Validation: Check file formats, total size, user quota, min 5 max 50 files
+    - Upload flow:
+      1. Validate files and settings
+      2. Call createBatchJob API (returns upload URLs)
+      3. Upload files in parallel (5 concurrent, show individual progress)
+      4. Track overall progress percentage
+      5. On success, show confirmation with "Start Processing" button
+    - Progress tracking: Individual progress bars for each file, overall progress bar, upload speed, ETA
+    - Error handling: Display per-file errors, allow retry individual files
+    - Success state: "Batch created successfully" message, option to start processing immediately
+    - Shadcn components: Dialog, Button, Input, Textarea, Checkbox, RadioGroup, Select, Progress, ScrollArea, Collapsible, Label
+    - Create file: `frontend/src/components/batch/BatchUploadModal.tsx`
+  - [ ] 4.5 Create BatchJobsList component
+    - Client component displaying all batch jobs for user
+    - Props: userId (string, optional), onJobClick (function, optional), refreshInterval (number, default 5000)
+    - State: batchJobs (BatchJob[]), isLoading (boolean), error (string), filters (status, sort), pagination (limit, offset)
+    - Fetch batch jobs on mount using getBatchJobs
+    - Auto-refresh: Poll every refreshInterval if any batch is processing
+    - Display as table with columns:
+      - Name (clickable, opens details)
+      - Description (truncated)
+      - Status badge (color-coded with icon)
+      - Progress (X/Y videos with progress bar)
+      - Progress percentage (0-100%)
+      - Created date (relative: "2 hours ago")
+      - Actions dropdown (View, Pause/Resume, Cancel, Retry Failed, Export, Delete)
+    - Sorting: By created_at (default, desc), status, progress, name
+    - Filtering: Status dropdown (all, pending, processing, paused, completed, failed, cancelled)
+    - Pagination: 20 items per page, previous/next buttons, page numbers
+    - Empty state: "No batch jobs yet" with "Create Batch" button
+    - Loading state: Skeleton loaders for rows (5 skeletons)
+    - Status badge colors: pending (gray), processing (blue), paused (yellow), completed (green), failed (red), cancelled (gray)
+    - Actions: Conditional based on status (e.g., pause only for processing, resume only for paused)
+    - Shadcn components: Table, Badge, Progress, Button, DropdownMenu, Skeleton, Select, Pagination
+    - Create file: `frontend/src/components/batch/BatchJobsList.tsx`
+  - [ ] 4.6 Create BatchJobDetails component
+    - Client component showing detailed batch job information
+    - Props: batchJobId (string)
+    - State: batchJob (BatchJob | null), isLoading (boolean), error (string), selectedVideos (string[])
+    - Fetch batch job details on mount using getBatchJob
+    - Subscribe to real-time updates via subscribeToBatchProgress
+    - Layout sections:
+      1. Header section:
+         - Batch name and description (editable if pending)
+         - Overall status badge with icon
+         - Action buttons: Pause/Resume, Cancel, Retry Failed, Export, Delete
+      2. Statistics cards (4 cards in grid):
+         - Total videos (with icon)
+         - Completed videos (green, with checkmark icon)
+         - Failed videos (red, with error icon)
+         - Pending videos (gray, with clock icon)
+      3. Progress section:
+         - Large progress bar with percentage label
+         - Time info: Created, Started, Estimated completion
+         - Current video being processed (if processing)
+      4. Settings display (Collapsible):
+         - All applied settings shown as read-only
+         - Processing options: badges for enabled features
+         - Export options: format and quality
+      5. Videos list section:
+         - Table with columns: Position, Video name, Status, Progress, Current stage, Duration, Actions
+         - Each row uses BatchVideoRow component
+         - Bulk actions: Select multiple videos, bulk retry, bulk remove (if pending)
+         - Sort by position (default), status, progress
+    - Real-time updates: Update progress bars, counters, current video on SSE events
+    - Error display: Alert component for failed videos with error messages
+    - Export section (shown when completed):
+      - Export format selector
+      - "Export All" button (opens BatchExportDialog)
+      - Export history (previous exports with download links)
+    - Shadcn components: Card, Badge, Progress, Button, Table, Separator, Collapsible, Alert, Checkbox
+    - Create file: `frontend/src/components/batch/BatchJobDetails.tsx`
+  - [ ] 4.7 Create BatchProgressPanel component
+    - Client component for real-time batch processing progress
+    - Props: batchJobId (string), compact (boolean, default false), onComplete (function, optional)
+    - State: progress (BatchProgress | null), isConnected (boolean), error (string)
+    - Subscribe to SSE endpoint on mount using subscribeToBatchProgress
+    - Display modes:
+      - Compact mode (for dashboard widget):
+        - Mini progress bar with percentage
+        - "X of Y videos completed" text
+        - Estimated time remaining
+        - Expand button to show full details
+      - Full mode (detailed view):
+        - Overall progress section (same as compact)
+        - Current video section:
+          - Video name and thumbnail
+          - Current stage label (e.g., "Transcribing...")
+          - Stage progress bar (if available)
+        - Recent activity log (ScrollArea):
+          - List of recent events with timestamps
+          - "Video 1: Transcription completed at 14:32"
+          - "Video 2: Silence removal in progress"
+        - Videos queue preview:
+          - Next 5 videos to be processed (with position numbers)
+          - Last 5 completed videos (with checkmarks)
+    - Live updates: Smooth progress bar animation (transition CSS)
+    - Notifications: Show toast when videos complete or fail
+    - Connection status: Show "Disconnected" badge if SSE connection lost
+    - Pause/Resume button: Integrated in panel header
+    - Shadcn components: Card, Progress, Button, Badge, ScrollArea, Separator, toast
+    - Create file: `frontend/src/components/batch/BatchProgressPanel.tsx`
+  - [ ] 4.8 Create BatchSettingsForm component
+    - Reusable client component for batch processing settings
+    - Props: initialSettings (BatchSettings, optional), onChange (function), showTemplates (boolean, default false)
+    - State: settings (BatchSettings), templates (BatchSettings[], optional)
+    - Form sections (using Form component with react-hook-form):
+      1. Transcription settings:
+         - Enable transcription checkbox
+         - Language select (if enabled): English, Spanish, Russian, German, French
+      2. Silence removal settings:
+         - Enable silence removal checkbox
+         - Threshold slider (-60dB to -20dB, step 1) with value label
+         - Minimum duration input (0.5s to 5s, step 0.5)
+      3. Highlight detection settings:
+         - Enable highlight detection checkbox
+         - Sensitivity radio (low, medium, high, max)
+         - Custom keywords input (textarea, comma-separated)
+      4. Export settings:
+         - Format select (MP4, MOV, WebM)
+         - Quality select (720p, 1080p, 4K)
+         - Resolution info text (based on quality)
+    - Real-time validation: Show warnings for invalid combinations
+    - Settings preview: Card showing summary of selected settings (collapsible)
+    - Template support (if showTemplates):
+      - "Save as template" button (opens dialog to name template)
+      - "Load template" select dropdown
+      - Saved templates stored in localStorage
+    - Reset to defaults button
+    - Controlled form: onChange fired on every setting change
+    - Shadcn components: Form, Checkbox, Select, Slider, Input, RadioGroup, Button, Label, Separator, Textarea, Card
+    - Create file: `frontend/src/components/batch/BatchSettingsForm.tsx`
+  - [ ] 4.9 Create BatchVideoRow component
+    - Client component displaying individual video in batch
+    - Props: batchVideo (BatchVideo), onAction (function), selectable (boolean, default false), selected (boolean, default false), onSelect (function, optional)
+    - Display format: Table row (tr element)
+    - Columns:
+      - Position: "#1", "#2", etc. with optional checkbox for selection
+      - Thumbnail: Video thumbnail image or placeholder icon
+      - Video name: Truncated with tooltip for full name
+      - Status: Badge with icon and color
+      - Progress: Progress bar (0-100%) with percentage text
+      - Current stage: Label with stage-specific icon
+      - Duration: Formatted as "MM:SS" or "H:MM:SS"
+      - Actions: Dropdown menu with contextual actions
+    - Status colors and icons:
+      - Pending: gray with clock icon
+      - Uploading: blue with upload icon
+      - Processing: yellow with spinner (animated)
+      - Completed: green with checkmark
+      - Failed: red with error icon (with tooltip showing error_message)
+      - Cancelled: gray with X icon
+    - Progress visualization:
+      - Progress bar component with percentage
+      - Stage indicator: Icons for each stage (transcribe, silence, highlights, export)
+      - Animated spinner icon for current stage
+    - Error state:
+      - Red border on row
+      - Error icon with tooltip showing full error_message
+      - Retry button prominent in actions
+      - Show retry count badge: "Retry 2/3"
+    - Completed state:
+      - Green border (subtle)
+      - Download button in actions
+      - "View Video" link
+      - Processing time shown in tooltip
+    - Actions dropdown (conditional based on status):
+      - All: "View Video" (links to video editor)
+      - Failed: "Retry" (calls retryFailedVideos for this video)
+      - Pending: "Remove" (removes from batch)
+      - Completed: "Download" (downloads output video)
+      - Failed: "View Error" (opens dialog with full error message)
+    - Interactive features:
+      - Click row to expand details (optional inline expansion)
+      - Hover to show quick actions
+      - Drag handle for reordering (if batch not started, using react-beautiful-dnd)
+    - Shadcn components: Badge, Progress, Button, DropdownMenu, Tooltip, AlertDialog, Checkbox
+    - Create file: `frontend/src/components/batch/BatchVideoRow.tsx`
+  - [ ] 4.10 Create BatchExportDialog component
+    - Client component for configuring and downloading batch export
+    - Props: batchJobId (string), isOpen (boolean), onClose (function)
+    - State: exportConfig (format, options), exportStatus (BatchExport | null), isExporting (boolean), error (string)
+    - Export configuration section:
+      - Format radio group:
+        - Individual files (ZIP) - default, with description "Download all videos as a ZIP archive"
+        - Merged video - "Combine all videos into a single file"
+        - Playlist (M3U8) - "Generate a playlist file for streaming"
+      - Options checkboxes:
+        - Include failed videos (disabled by default)
+        - Use original filenames (enabled by default)
+        - Add batch name prefix (disabled by default)
+      - Custom naming pattern input (for ZIP, optional):
+        - Placeholder: "{position}_{name}.{ext}"
+        - Help text: Use {position}, {name}, {ext} placeholders
+    - Export preview section:
+      - Estimated file size calculation (sum of video sizes)
+      - Number of videos to be included (based on include_failed option)
+      - Export format details (e.g., "ZIP archive with 20 MP4 files")
+    - Action buttons:
+      - "Export" button: Triggers exportBatch API call
+      - "Cancel" button: Closes dialog
+    - Progress section (shown when isExporting):
+      - Progress bar with percentage
+      - Current operation text: "Downloading video 5/20..."
+      - Estimated time remaining
+      - "Cancel Export" button (if supported)
+    - Download section (shown when export completed):
+      - Success message with file size
+      - Download button (large, primary) with download icon
+      - Expiration timer: "Link expires in 23 hours 45 minutes"
+      - Option to generate new export with different settings
+    - Error handling:
+      - Display error alerts with retry button
+      - Handle export timeout, network errors
+    - Export history section (collapsible):
+      - List of previous exports for this batch
+      - Each shows: Format, created date (relative), size, download button
+      - "Expired" badge for expired exports
+      - "Generating..." status for in-progress exports
+    - Shadcn components: Dialog, RadioGroup, Checkbox, Button, Progress, Alert, Separator, Badge, Input, Label, Collapsible
+    - Create file: `frontend/src/components/batch/BatchExportDialog.tsx`
+  - [ ] 4.11 Ensure UI component tests pass
+    - Run ONLY the tests written in 4.1
+    - Verify all components render correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 4.1 pass
+- BatchUploadModal handles multi-file upload with progress tracking
+- BatchJobsList displays batches with filtering, sorting, and pagination
+- BatchJobDetails shows comprehensive batch information with real-time updates
+- BatchProgressPanel streams live progress via SSE
+- BatchSettingsForm provides reusable settings configuration
+- BatchVideoRow displays video status with actions
+- BatchExportDialog configures and downloads exports
+- All components use Shadcn UI and follow design system
+- Real-time updates work smoothly without flickering
+
+### Integration & Testing
+
+#### Task Group 5: Integration, E2E Tests, and Feature Completion
+**Dependencies:** Task Groups 1-4
+
+- [ ] 5.0 Complete integration and testing
+  - [ ] 5.1 Write integration tests for batch workflow
+    - Test full batch upload flow (create batch → upload files → start processing)
+    - Test batch processing orchestration (process all videos with shared settings)
+    - Test pause and resume workflow (pause → verify state → resume → complete)
+    - Test cancellation workflow (cancel → verify cleanup)
+    - Test retry workflow (fail videos → retry → verify retry count)
+    - Test export workflow (complete batch → export ZIP → download)
+    - Test concurrent batches (multiple users, multiple batches per user)
+    - Test quota enforcement (exceed limits, verify rejection)
+  - [ ] 5.2 Write E2E tests for batch UI
+    - E2E: User creates batch with 5 videos and custom settings
+    - E2E: User monitors batch progress in real-time
+    - E2E: User pauses and resumes batch processing
+    - E2E: User retries failed videos
+    - E2E: User exports completed batch as ZIP
+    - E2E: User manages multiple batches in BatchJobsList
+    - E2E: User filters and sorts batch jobs
+    - E2E: User deletes completed batch
+  - [ ] 5.3 Performance and stress testing
+    - Test batch upload with 50 videos (max tier)
+    - Test concurrent video processing (5 videos in parallel)
+    - Test export generation with 50 videos
+    - Test SSE connection stability over long batch (2+ hours)
+    - Test database query performance with 100+ batches
+    - Verify memory usage during export (no memory leaks)
+    - Test Redis state persistence under worker restart
+  - [ ] 5.4 Error handling and recovery testing
+    - Test individual video failure (verify batch continues)
+    - Test worker crash during processing (verify job recovery)
+    - Test network errors during upload (verify retry)
+    - Test S3 errors during export (verify error handling)
+    - Test Redis connection loss (verify reconnection)
+    - Test concurrent modifications (verify race conditions handled)
+    - Test invalid state transitions (verify validation)
+  - [ ] 5.5 Integration with existing features
+    - Integrate BatchUploadModal in Dashboard ("Batch Upload" button)
+    - Add "Batch Jobs" section to Dashboard sidebar
+    - Display active batches in Dashboard with BatchProgressPanel
+    - Link videos to their batch jobs in Video List (badge with batch icon)
+    - Add batch indicator in Video Editor (link to batch details)
+    - Integrate batch processing usage in billing/quota tracking
+    - Add batch job notifications (completion, failure) to notification center
+    - Add batch analytics to Analytics dashboard (job stats, success rates)
+  - [ ] 5.6 Documentation and help content
+    - Add batch processing guide to help documentation
+    - Create tooltips for batch settings (explain each option)
+    - Add onboarding tour for batch upload modal
+    - Create example batch configurations (e.g., "Podcast Series", "YouTube Uploads")
+    - Document API endpoints in OpenAPI spec
+    - Add troubleshooting section for common batch errors
+  - [ ] 5.7 Review and optimize
+    - Code review for all batch processing code
+    - Performance review: optimize slow queries, reduce API calls
+    - Security review: validate all inputs, check authorization
+    - UX review: ensure smooth flow, clear error messages
+    - Accessibility review: keyboard navigation, screen reader support
+    - Mobile responsiveness: test batch UI on mobile devices
+  - [ ] 5.8 Run comprehensive test suite
+    - Run all batch processing tests (unit, integration, E2E)
+    - Run regression tests (ensure existing features still work)
+    - Verify test coverage >85% for batch processing code
+    - Fix any failing tests
+  - [ ] 5.9 Deployment preparation
+    - Update environment variables documentation
+    - Create database migration checklist
+    - Prepare rollback plan
+    - Set up monitoring for batch jobs (success rates, processing times)
+    - Configure alerts for high failure rates
+    - Update user-facing changelog
+    - Prepare announcement for batch processing feature
+
+**Acceptance Criteria:**
+- All integration tests pass
+- All E2E tests pass
+- Performance meets success criteria (see spec)
+- Error handling covers all edge cases
+- Feature integrated with existing UI
+- Documentation is complete and accurate
+- Code review approved
+- Test coverage >85%
+- Ready for deployment
+
+## Execution Order
+1. Database Layer (Task Group 1)
+2. Backend Services Layer (Task Group 2)
+3. Backend API Layer (Task Group 3)
+4. Frontend Components (Task Group 4)
+5. Integration & Testing (Task Group 5)

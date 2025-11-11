@@ -1,9 +1,14 @@
 # AI Video Clipper - Project Tasks
 
-> **Last Updated:** 2025-11-07
-> **Status:** MVP Development Phase - Phase 1 Foundation nearly complete
+> **Last Updated:** 2025-11-11
+> **Status:** MVP Development Phase - Phase 1 Foundation complete, comprehensive specs created for all remaining features
 
 This file tracks implementation status of all features defined in PRD.md. Use `/feature [name]` slash command to implement features systematically.
+
+> **📋 New Comprehensive Specifications Available:**
+> - All missing features now have complete specifications in `agent-os/specs/`
+> - Each spec includes detailed requirements, database models, API endpoints, frontend components, and testing strategies
+> - Ready for implementation using the `/feature` command or manual development
 
 ---
 
@@ -376,48 +381,37 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
 
 **Dependencies:** Timeline Editor, Video Processing Service
 
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-video-export-complete/`
+
 #### 8.1 Backend Implementation
-- 🔴 Export model
-  - video_id, user_id
-  - Resolution, format, quality
-  - Output URL (S3)
-  - Status, progress
-  - File size
-- 🔴 Export service
-  - Combine selected segments
-  - Re-encode with settings
-  - Upload to S3
-  - Generate download URL
-- 🔴 Background job
-  - ARQ task: export_video
-  - Progress tracking (%)
-  - Estimated time remaining
-- 🔴 API endpoints
-  - POST /api/videos/{id}/export
-    - Parameters: resolution, quality, segments
-  - GET /api/exports/{id}
-    - Export status and progress
-  - GET /api/exports/{id}/download
-    - Generate download URL
-- 🔴 Database migration
-- 🔴 Tests
+- 🔴 Export model (resolution, format, quality, export_type, segments, status, progress)
+- 🔴 FFmpeg/PyAV integration service (scaling, quality presets, format conversion)
+- 🔴 Segment extraction and concatenation service
+- 🔴 Export processing service (orchestrates full workflow)
+- 🔴 Background job: export_video ARQ task with progress tracking
+- 🔴 API endpoints (7 endpoints)
+  - POST /api/videos/{id}/export - Create export job
+  - GET /api/exports/{id} - Get export details
+  - GET /api/exports/{id}/progress - Real-time progress
+  - GET /api/exports/{id}/download - Generate download URL
+  - DELETE /api/exports/{id} - Cancel/delete export
+  - GET /api/videos/{id}/exports - List all exports
+- 🔴 Database migration with indexes
+- 🔴 Tests (unit, integration, worker, E2E)
 
 #### 8.2 Frontend Implementation
-- 🔴 Export modal
-  - Resolution selector (720p, 1080p)
-  - Quality preset (High, Medium, Low)
-  - Export options (single/multiple clips)
-- 🔴 Export progress
-  - Progress bar
-  - Estimated time remaining
-  - Real-time updates via SSE
-- 🔴 Download functionality
-  - Download button
-  - ZIP for multiple clips
-  - Copy shareable link
-- 🔴 Tests
+- 🔴 TypeScript types (Export, ExportStatus, ExportConfig, etc.)
+- 🔴 Frontend API client (8 functions)
+- 🔴 ExportModal component (resolution, quality, format, export type selectors)
+- 🔴 ExportProgress component (real-time polling, stage indicators)
+- 🔴 ExportsList component (export history, download, delete)
+- 🔴 ExportSettings component (user preferences, presets)
+- 🔴 Integration with Timeline Editor, Video Editor, Dashboard
+- 🔴 Tests (component, E2E)
 
-**Status:** 🔴 Not Started
+**Task Breakdown:** See `agent-os/specs/2025-11-11-video-export-complete/tasks.md` (60+ tasks across 6 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
@@ -456,76 +450,129 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
 ## Post-MVP Phase (Month 4-6) - SHOULD HAVE
 
 ### 10. Auto-Highlight Detection (Feature #9)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Implement highlight scoring algorithm
-- Audio energy analysis
-- Scene change detection (PySceneDetect)
-- Keyword-based scoring
-- API endpoints for highlights
-- Frontend highlight suggestions UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-auto-highlight-detection/`
+
+**Implementation Overview:**
+- 🔴 Highlight model with scoring fields (audio, scene, speech, keyword scores)
+- 🔴 Audio analysis service (energy detection, VAD, speech density)
+- 🔴 Video analysis service (scene change detection, PySceneDetect integration)
+- 🔴 Speech pattern analysis (rate, pauses, emphasis)
+- 🔴 Keyword scoring service (configurable highlight keywords)
+- 🔴 Composite scoring algorithm (weighted average with bonuses)
+- 🔴 Highlight detection service (orchestrates all analysis)
+- 🔴 Background job: detect_highlights with sensitivity levels
+- 🔴 API endpoints (6 endpoints for detection, retrieval, update)
+- 🔴 Frontend components: HighlightsPanel, HighlightCard, HighlightDetectionTrigger, HighlightScoreBreakdown, HighlightPreview
+- 🔴 Tests (unit, integration, accuracy validation, E2E)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-auto-highlight-detection/tasks.md` (41 tasks across 5 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
 ### 11. Batch Processing (Feature #10)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Batch upload API
-- Queue management system
-- Apply settings to multiple videos
-- Bulk export functionality
-- Frontend batch operations UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-batch-processing/`
+
+**Implementation Overview:**
+- 🔴 BatchJob and BatchVideo models (status, progress, shared settings)
+- 🔴 Batch upload service (multi-file presigned URLs, parallel uploads)
+- 🔴 Batch processing service (apply settings to all videos, queue management)
+- 🔴 Batch export service (ZIP archives, merged videos, playlists)
+- 🔴 API endpoints (13 endpoints for batch operations)
+- 🔴 Background jobs with pause/resume/cancel support
+- 🔴 Frontend components: BatchUploadModal, BatchJobsList, BatchJobDetails, BatchProgressPanel
+- 🔴 Tests (concurrency, failure recovery, E2E workflows)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-batch-processing/tasks.md` (45+ tasks across 5 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
 ### 12. Embedded Subtitles (Feature #11)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Subtitle styling options
-- Burn subtitles into video (FFmpeg)
-- Multi-language support
-- Google Translate API integration
-- Subtitle customization UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-embedded-subtitles/`
+
+**Implementation Overview:**
+- 🔴 SubtitleStyle model (30+ properties: font, color, background, position, animation)
+- 🔴 SubtitleTranslation model with Google Translate API integration
+- 🔴 Subtitle styling service (validation, preset management)
+- 🔴 Subtitle burning service (FFmpeg ASS/SRT generation and overlay)
+- 🔴 Translation service (18+ languages, batch translation, cost management)
+- 🔴 Platform-specific presets (YouTube, TikTok, Instagram, LinkedIn)
+- 🔴 API endpoints (20+ endpoints for styles, burning, translation, previews)
+- 🔴 Frontend components: SubtitleStyleEditor, SubtitlePreview, TranslationPanel, SubtitleBurnDialog
+- 🔴 Tests (visual regression, accessibility, performance)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-embedded-subtitles/tasks.md` (60+ tasks across 5 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
 ### 13. Social Media Templates (Feature #12)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Template presets (YouTube Shorts, TikTok, Instagram)
-- Aspect ratio conversion (9:16)
-- Duration limits enforcement
-- Auto-caption overlay
-- Template selection UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-social-media-templates/`
+
+**Implementation Overview:**
+- 🔴 SocialMediaTemplate and VideoExport models
+- 🔴 Video transformation service (smart crop, letterbox, blur background for aspect ratios)
+- 🔴 Duration enforcement service (smart trimming using highlight scores)
+- 🔴 Caption overlay service (burn captions with platform-specific styling)
+- 🔴 7 caption style presets (Minimal, Bold, Gaming, Podcast, Vlog, Professional, Trendy)
+- 🔴 Platform presets (YouTube Shorts, TikTok, Instagram Reels, Twitter, LinkedIn)
+- 🔴 API endpoints (13 endpoints for templates and exports)
+- 🔴 Frontend components: TemplateSelector, PlatformPreview, AspectRatioEditor, ExportDialog, QuickExport
+- 🔴 Tests (platform compliance, visual quality, one-click export)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-social-media-templates/tasks.md` (50+ tasks across 5 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
 ### 14. Team Collaboration (Feature #13)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Organization/team models
-- Role-based access control (RBAC)
-- Sharing functionality
-- Timeline comments
-- Version history
-- Collaboration UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-team-collaboration/`
+
+**Implementation Overview:**
+- 🔴 7 database models (Organization, TeamMember, VideoPermission, VideoShare, Comment, Version, Notification)
+- 🔴 Permission service with RBAC (viewer, editor, admin roles)
+- 🔴 Video sharing service (users, teams, secure links with expiration)
+- 🔴 Comment system with mentions, replies, reactions
+- 🔴 Version control with rollback capability
+- 🔴 Real-time collaboration via WebSocket (live comments, presence tracking)
+- 🔴 API endpoints (50+ REST + WebSocket endpoints)
+- 🔴 Frontend components: OrganizationManager, ShareModal, CommentsPanel, VersionHistory, ActiveUsers, NotificationBell
+- 🔴 Tests (security, WebSocket load, collaboration workflows)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-team-collaboration/tasks.md` (150+ tasks across 6 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
 ### 15. Advanced Editor (Feature #14)
-**Status:** 🔴 Not Started
 
-**Tasks:**
-- Multi-track timeline
-- Image/overlay support
-- Transitions library
-- Background music
-- Advanced editor UI
+**📋 Comprehensive Spec Available:** `agent-os/specs/2025-11-11-advanced-editor/`
+
+**Implementation Overview:**
+- 🔴 5 database models (Project, Track, TrackItem, Asset, Transition with effects)
+- 🔴 Composition service (multi-track project management)
+- 🔴 Audio mixing service (multi-track audio, fade in/out, normalization)
+- 🔴 Video rendering service (FFmpeg filter complex for composition)
+- 🔴 Transition library (fade, dissolve, slide, wipe, zoom, blur)
+- 🔴 Asset library (images, audio, fonts for text overlays)
+- 🔴 API endpoints (40+ endpoints for projects, tracks, items, assets)
+- 🔴 Frontend components: MultiTrackTimeline, AssetLibrary, TransitionSelector, AudioMixer, PropertyPanel, CompositionPreview
+- 🔴 Tests (rendering accuracy, timeline performance with 100+ items)
+
+**Task Breakdown:** See `agent-os/specs/2025-11-11-advanced-editor/tasks.md` (84 tasks across 5 groups)
+
+**Status:** 🔴 Spec Complete - Ready for Implementation
 
 ---
 
@@ -619,6 +666,26 @@ This file tracks implementation status of all features defined in PRD.md. Use `/
 - Refer to CLAUDE.md for development guidelines
 - All MUST HAVE features should be completed before moving to SHOULD HAVE
 
+**📋 Specification Documentation:**
+- All features (#7-14) now have comprehensive specifications in `agent-os/specs/2025-11-11-*/`
+- Each spec includes: spec.md (requirements) and tasks.md (implementation tasks)
+- Total: 7 complete specifications with 500+ actionable tasks
+- Specifications follow test-driven development approach with clear acceptance criteria
+
+**🔢 Numbered Implementation Tasks:**
+- See `/IMPLEMENTATION_TASKS.md` for 999 numbered tasks across all 7 features
+- Tasks are numbered for easy reference in parallel Claude Code sessions
+- Format: Task 001-199 (Video Export), 200-299 (Auto-Highlight), etc.
+- Use task numbers to coordinate work across multiple sessions
+- Example: "Session 1: Implement tasks 001-050, Session 2: Implement tasks 051-100"
+
+**✅ Test Files Created:**
+- Backend: 630+ pytest tests across 30+ test files
+- Frontend: 64 component tests (Vitest) across 5 files
+- E2E: 78 scenarios (Playwright) across 5 files
+- Total: 772+ comprehensive tests ready to guide TDD implementation
+- All tests follow RSpec/Capybara-style BDD patterns
+
 ---
 
-**Last Reviewed:** 2025-11-07
+**Last Reviewed:** 2025-11-11

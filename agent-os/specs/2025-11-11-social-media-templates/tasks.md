@@ -1,0 +1,579 @@
+# Task Breakdown: Social Media Templates
+
+## Overview
+Total Tasks: 5 task groups, 50+ sub-tasks
+
+## Task List
+
+### Database Layer
+
+#### Task Group 1: Template and Export Models
+**Dependencies:** Video Upload (Task Group 1), User Authentication
+
+- [ ] 1.0 Complete database layer
+  - [ ] 1.1 Write 2-8 focused tests for SocialMediaTemplate model functionality
+    - Test SocialMediaTemplate model creation with required fields (platform, name, aspect_ratio, max_duration_seconds)
+    - Test SocialMediaTemplate model validation (platform enum, aspect_ratio format, duration limits)
+    - Test SocialMediaTemplate caption_style JSONB field storage and retrieval
+    - Test SocialMediaTemplate system preset vs user template differentiation (is_system_preset, user_id)
+    - Test SocialMediaTemplate relationships with User
+    - Test SocialMediaTemplate timestamps (created_at, updated_at)
+    - Test VideoExport model creation with required fields (video_id, template_id, status)
+    - Test VideoExport model status transitions (processing → completed/failed)
+  - [ ] 1.2 Create SocialMediaTemplate model with validations
+    - Fields: id (UUID), platform enum ('youtube_shorts', 'tiktok', 'instagram_reels', 'twitter', 'linkedin', 'custom')
+    - aspect_ratio (string, e.g., '9:16', '16:9', '1:1'), max_duration_seconds (integer)
+    - auto_captions (boolean), caption_style (JSONB containing font, size, color, position, background, animation)
+    - style_preset enum ('minimal', 'bold', 'gaming', 'podcast', 'vlog', 'professional', 'trendy', 'custom')
+    - video_codec (string, default 'h264'), audio_codec (string, default 'aac'), bitrate (string, default '5M')
+    - name (string), description (text), is_system_preset (boolean), user_id (foreign key, nullable for system templates)
+    - is_active (boolean), usage_count (integer)
+    - Timestamps (created_at, updated_at)
+    - Reuse pattern from: Video model in `backend/app/models/video.py`
+  - [ ] 1.3 Create VideoExport model with validations
+    - Fields: id (UUID), video_id (foreign key to videos), template_id (foreign key to templates)
+    - export_url (string, S3 URL), status enum ('processing', 'completed', 'failed')
+    - file_size (integer, bytes), resolution (string, e.g., '1080x1920'), duration_seconds (integer)
+    - segment_start_time (float, nullable), segment_end_time (float, nullable)
+    - crop_strategy enum ('smart', 'center', 'letterbox', 'blur')
+    - error_message (text, nullable), timestamps (created_at, updated_at, completed_at)
+    - Reuse pattern from: Video model in `backend/app/models/video.py`
+  - [ ] 1.4 Create migration for social_media_templates table
+    - Add indexes on platform, user_id, is_active, is_system_preset for fast lookups
+    - Add platform enum type (youtube_shorts, tiktok, instagram_reels, twitter, linkedin, custom)
+    - Add style_preset enum type (minimal, bold, gaming, podcast, vlog, professional, trendy, custom)
+    - JSONB column for caption_style
+    - Foreign key relationship to users table (nullable)
+    - Add check constraints for aspect_ratio format (e.g., '^\d+:\d+$')
+  - [ ] 1.5 Create migration for video_exports table
+    - Add indexes on video_id, template_id, status for fast lookups
+    - Add status enum type (processing, completed, failed)
+    - Add crop_strategy enum type (smart, center, letterbox, blur)
+    - Foreign key relationships to videos and social_media_templates tables
+    - Add check constraints for segment times (start < end, >= 0)
+  - [ ] 1.6 Set up associations
+    - SocialMediaTemplate belongs_to User (user_id foreign key, nullable)
+    - User has_many SocialMediaTemplates (relationship defined)
+    - VideoExport belongs_to Video (video_id foreign key)
+    - VideoExport belongs_to SocialMediaTemplate (template_id foreign key)
+    - Video has_many VideoExports (relationship defined)
+    - SocialMediaTemplate has_many VideoExports (relationship defined)
+  - [ ] 1.7 Seed system preset templates
+    - Create seed data for YouTube Shorts (9:16, 60s, bold captions)
+    - Create seed data for TikTok (9:16, 60s, animated captions)
+    - Create seed data for Instagram Reels (9:16, 90s, clean captions)
+    - Create seed data for Twitter/X (16:9 or 1:1, 140s, minimal captions)
+    - Create seed data for LinkedIn (1:1, 600s, professional captions)
+    - Set is_system_preset=true and user_id=null for all system templates
+    - Include platform-specific caption styles in JSON format
+  - [ ] 1.8 Ensure database layer tests pass
+    - Run ONLY the 2-8 tests written in 1.1
+    - Verify migrations run successfully
+    - Verify seed data is created correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The 2-8 tests written in 1.1 pass
+- SocialMediaTemplate and VideoExport models pass validation tests
+- Migrations run successfully
+- Associations work correctly
+- System presets are seeded correctly
+- Indexes are created for performance
+
+### Video Transformation Services
+
+#### Task Group 2: Aspect Ratio, Duration, and Caption Services
+**Dependencies:** Task Group 1, Video Upload (video processing infrastructure)
+
+- [ ] 2.0 Complete video transformation services
+  - [ ] 2.1 Write 2-8 focused tests for VideoTransformationService
+    - Test aspect ratio conversion: 16:9 to 9:16 with smart crop strategy
+    - Test aspect ratio conversion: 16:9 to 1:1 with center crop strategy
+    - Test aspect ratio conversion: any to any with letterbox strategy
+    - Test aspect ratio conversion: any to any with blur background strategy
+    - Test smart crop: face detection and tracking for consistent framing
+    - Test blur background: Gaussian blur composite with vignette
+    - Test resolution scaling: maintain quality with high-quality algorithms
+    - Test hardware acceleration: NVENC/VideoToolbox when available
+  - [ ] 2.2 Write 2-8 focused tests for DurationEnforcementService
+    - Test trim strategy: keep last N seconds from video
+    - Test trim strategy: keep first N seconds from video
+    - Test trim strategy: smart trim using highlight scores
+    - Test trim strategy: user-selected segment extraction
+    - Test edge case: video shorter than limit (no trimming)
+    - Test edge case: video exactly at limit (minor buffer trim)
+    - Test edge case: very long video (segment selection)
+    - Test trim metadata storage (start_time, end_time, duration)
+  - [ ] 2.3 Write 2-8 focused tests for CaptionOverlayService
+    - Test caption rendering: word-level timing from Whisper transcript
+    - Test caption chunking: 2-5 words per caption with natural breaks
+    - Test caption positioning: bottom, center, top with safe zones
+    - Test caption styling: font, color, background, outline rendering
+    - Test caption animations: fade, slide, pop, word-by-word
+    - Test caption timing: minimum 0.8s per caption, no overlaps
+    - Test special cases: multiple speakers, long words, emojis
+    - Test accessibility: WCAG AA contrast ratio compliance
+  - [ ] 2.4 Create VideoTransformationService class
+    - Implement smart crop algorithm with face detection (OpenCV/MediaPipe)
+    - Implement face tracking across frames for consistent framing
+    - Implement motion detection for active areas (when no faces)
+    - Implement smooth crop transitions (avoid jarring jumps)
+    - Implement center crop strategy with aspect ratio maintenance
+    - Implement letterbox strategy with configurable bar color
+    - Implement blur background strategy with Gaussian blur and vignette
+    - Support hardware acceleration (NVENC, VideoToolbox, VAAPI)
+    - Use PyAV or FFmpeg for video transformations
+    - Maintain video quality with high-quality scaling algorithms
+    - Create file: `backend/app/services/video_transformation.py`
+  - [ ] 2.5 Create DurationEnforcementService class
+    - Implement trim start strategy (keep last N seconds)
+    - Implement trim end strategy (keep first N seconds)
+    - Implement smart trim using highlight scores (if available)
+    - Implement audio energy analysis for best segment (when no highlights)
+    - Ensure selected segment is coherent (avoid mid-sentence cuts)
+    - Handle edge cases (shorter than limit, exactly at limit, very long)
+    - Store trim metadata (original_duration, trimmed_duration, start_time, end_time)
+    - Provide preview capability before final export
+    - Create file: `backend/app/services/duration_enforcement.py`
+  - [ ] 2.6 Create CaptionOverlayService class
+    - Parse Whisper transcript into caption chunks (2-5 words)
+    - Calculate display timing with buffers (minimum 0.8s per caption)
+    - Break long sentences at natural pauses (commas, periods)
+    - Apply platform-specific styling from template
+    - Render text with FFmpeg drawtext filter or PIL/Pillow
+    - Add background box with padding and corner radius
+    - Add text outline/stroke for readability
+    - Position captions with platform safe zones (avoid UI overlap)
+    - Apply animations (fade in/out, word-by-word reveal)
+    - Handle special cases (speakers, long words, emojis, punctuation)
+    - Cache rendered caption frames for performance
+    - Verify caption timing accuracy (±0.1s)
+    - Check contrast ratio for accessibility (WCAG AA)
+    - Create file: `backend/app/services/caption_overlay.py`
+  - [ ] 2.7 Create caption style preset configurations
+    - Minimal preset: small sans-serif, white text with black outline, bottom, no background, fade
+    - Bold preset: large bold font, white text with yellow background, bottom-center, pop animation
+    - Gaming preset: bright colors (cyan/magenta), large bold, center, word-by-word animation
+    - Podcast preset: clean serif, medium size, white text with dark background, center
+    - Vlog preset: rounded font, medium size, colored text, bottom, slide-up animation
+    - Professional preset: sans-serif, medium size, black on white, bottom, simple fade
+    - Trendy preset: modern font with style variations, animated transitions, emoji highlights
+    - Store presets as JSON configurations in constants file
+    - Create file: `backend/app/services/caption_presets.py`
+  - [ ] 2.8 Ensure service layer tests pass
+    - Run ONLY the tests written in 2.1, 2.2, 2.3
+    - Verify all transformation strategies work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 2.1, 2.2, 2.3 pass
+- VideoTransformationService converts aspect ratios correctly
+- Smart crop accurately identifies main subject (>80% accuracy)
+- DurationEnforcementService trims videos correctly
+- CaptionOverlayService renders captions with proper styling
+- All caption presets are defined and working
+- Video quality is maintained during transformations
+- Hardware acceleration is used when available
+
+### API Endpoints and Background Worker
+
+#### Task Group 3: Template and Export API with ARQ Worker
+**Dependencies:** Task Group 2, ARQ Worker setup
+
+- [ ] 3.0 Complete API layer and background processing
+  - [ ] 3.1 Write 2-8 focused tests for template endpoints
+    - Test GET /api/templates returns all templates with filtering (platform, is_system_preset)
+    - Test GET /api/templates/{id} returns single template details
+    - Test POST /api/templates creates custom template with validation
+    - Test PATCH /api/templates/{id} updates user-owned template only
+    - Test DELETE /api/templates/{id} soft deletes user-owned template only
+    - Test GET /api/templates/presets returns all system presets
+    - Test template permissions: users cannot edit/delete system presets
+    - Test aspect ratio validation: reject invalid formats
+  - [ ] 3.2 Write 2-8 focused tests for export endpoints
+    - Test POST /api/videos/{id}/export creates export job with valid config
+    - Test POST /api/videos/{id}/export validates segment times
+    - Test POST /api/videos/{id}/export prevents duplicate exports in progress
+    - Test GET /api/videos/{id}/exports lists all exports for video
+    - Test GET /api/exports/{id} returns export details with download URL
+    - Test GET /api/exports/{id}/progress returns real-time progress
+    - Test DELETE /api/exports/{id} removes export and S3 file
+    - Test POST /api/exports/{id}/retry re-enqueues failed export
+  - [ ] 3.3 Write 2-8 focused tests for preview endpoints
+    - Test POST /api/videos/{id}/preview-export generates quick preview
+    - Test preview generation uses lower quality (720p, 30s max)
+    - Test preview URL expires after 1 hour
+    - Test GET /api/templates/{id}/sample returns template sample video
+    - Test preview caching for performance
+  - [ ] 3.4 Create Pydantic schemas for request/response validation
+    - TemplateCreate schema (name, platform, aspect_ratio, max_duration_seconds, caption_style, style_preset)
+    - TemplateUpdate schema (partial updates allowed)
+    - TemplateResponse schema (id, platform, name, aspect_ratio, caption_style, is_system_preset, user_id, usage_count, timestamps)
+    - ExportCreate schema (template_id, segment_start_time, segment_end_time, crop_strategy, quality, enable_captions)
+    - ExportResponse schema (id, video_id, template_id, export_url, status, file_size, resolution, duration, timestamps)
+    - ExportProgress schema (progress, status, current_stage, estimated_time_remaining)
+    - PreviewCreate schema (template_id, segment_start_time, segment_end_time, crop_strategy)
+    - CaptionStyle schema (font_family, font_size, font_weight, colors, position, animation, etc.)
+    - Create enums: PlatformType, StylePreset, CropStrategy, ExportStatus, ExportStage, QualityPreset
+    - Create file: `backend/app/schemas/template.py` and `backend/app/schemas/export.py`
+  - [ ] 3.5 Implement template management API endpoints
+    - GET /api/templates: List templates with pagination, filtering (platform, is_system_preset, user_id, is_active)
+    - GET /api/templates/{id}: Get single template with full configuration
+    - POST /api/templates: Create custom template with validation
+    - PATCH /api/templates/{id}: Update user-owned template (block system presets)
+    - DELETE /api/templates/{id}: Soft delete user-owned template (set is_active=false)
+    - GET /api/templates/presets: Get all system presets with platform requirements
+    - Add authentication using get_current_user dependency
+    - Add permission checks (users can only modify their own templates)
+    - Follow pattern from: existing API routes in `backend/app/api/routes/`
+    - Create file: `backend/app/api/routes/templates.py`
+  - [ ] 3.6 Implement video export API endpoints
+    - POST /api/videos/{id}/export: Create export with template, validate inputs, enqueue ARQ job
+    - GET /api/videos/{id}/exports: List exports with filtering (template_id, status), pagination
+    - GET /api/exports/{id}: Get export details with presigned S3 URL (1 hour expiration)
+    - DELETE /api/exports/{id}: Delete export record and S3 file
+    - GET /api/exports/{id}/progress: Get real-time progress from Redis
+    - POST /api/exports/{id}/retry: Retry failed export with same configuration
+    - Prevent duplicate exports (check if identical export already processing)
+    - Add authentication and authorization checks
+    - Create file: `backend/app/api/routes/exports.py`
+  - [ ] 3.7 Implement preview API endpoints
+    - POST /api/videos/{id}/preview-export: Generate low-quality preview (720p, 30s max)
+    - GET /api/templates/{id}/sample: Return template sample video URL
+    - Implement preview caching for performance
+    - Create temporary preview URLs with 1-hour expiration
+    - Create file: `backend/app/api/routes/previews.py` or add to exports.py
+  - [ ] 3.8 Create ARQ task: export_video_with_template
+    - Task function: export_video_with_template(video_id, template_id, export_config)
+    - Workflow step 1: Download original video from S3 (progress 0-10%)
+    - Workflow step 2: Extract segment if specified (progress 10-20%)
+    - Workflow step 3: Apply aspect ratio transformation based on crop_strategy (progress 20-40%)
+    - Workflow step 4: Trim to platform duration limit if needed (progress 40-50%)
+    - Workflow step 5: Generate and overlay captions if enabled (progress 50-75%)
+    - Workflow step 6: Encode video with platform-specific settings (progress 75-95%)
+    - Workflow step 7: Upload to S3 with unique filename (progress 95-100%)
+    - Workflow step 8: Update VideoExport record with URL and metadata
+    - Track progress in Redis (key: export_progress:{export_id})
+    - Clean up temporary files after completion
+    - Handle errors with retry logic (max 3 attempts, exponential backoff)
+    - Store error details in VideoExport record on failure
+    - Use hardware acceleration for encoding when available
+    - Timeout: 20 minutes for standard videos, 40 minutes for long videos
+    - Register task in worker.py
+    - Create file: `backend/app/worker.py` (update existing)
+  - [ ] 3.9 Implement progress tracking in Redis
+    - Track export progress (0-100%) in Redis
+    - Key format: export_progress:{export_id}
+    - Store JSON: {progress, status, current_stage, estimated_time_remaining}
+    - Update progress at each workflow stage
+    - Set TTL: 24 hours (auto-cleanup)
+    - Clear progress key on completion or permanent failure
+  - [ ] 3.10 Implement error handling and retry logic
+    - Handle S3 upload/download errors with retry (max 3 attempts)
+    - Handle FFmpeg encoding errors with detailed error messages
+    - Handle service errors (transformation, duration, caption)
+    - Exponential backoff for transient failures
+    - Update VideoExport status to 'failed' on permanent failure
+    - Store error_message in VideoExport record for debugging
+    - Log all errors for monitoring
+    - Send error notification to user (future: email/websocket)
+  - [ ] 3.11 Ensure API layer tests pass
+    - Run ONLY the tests written in 3.1, 3.2, 3.3
+    - Verify all endpoints work correctly
+    - Verify ARQ task processes exports correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 3.1, 3.2, 3.3 pass
+- All template management endpoints work correctly
+- All export endpoints work correctly
+- ARQ task processes exports asynchronously
+- Progress tracking works in Redis
+- Error handling and retries work correctly
+- Permission checks prevent unauthorized access
+- Export completes in <5 minutes for 30-minute video
+
+### Frontend Components
+
+#### Task Group 4: Template Selection and Export UI
+**Dependencies:** Task Group 3
+
+- [ ] 4.0 Complete UI components
+  - [ ] 4.1 Write 2-8 focused tests for template components
+    - Test TemplateSelector fetches and displays system presets
+    - Test TemplateSelector displays user custom templates
+    - Test TemplateSelector template selection and onTemplateSelect callback
+    - Test TemplateSelector filtering by platform and search
+    - Test PlatformPreview displays video in correct aspect ratio
+    - Test PlatformPreview shows platform UI overlay (TikTok, Instagram, YouTube)
+    - Test PlatformPreview generates preview on button click
+    - Test AspectRatioEditor strategy selection and preview
+  - [ ] 4.2 Write 2-8 focused tests for export components
+    - Test ExportDialog multi-step workflow (template → segment → aspect → preview → export)
+    - Test ExportDialog segment selection with timeline
+    - Test ExportDialog export progress display with stages
+    - Test ExportDialog success and error states
+    - Test ExportsList fetches and displays exports
+    - Test ExportsList auto-refresh for in-progress exports
+    - Test QuickExport one-click export with default template
+    - Test TemplateCreator custom template creation with validation
+  - [ ] 4.3 Create TypeScript type definitions
+    - Template interface (id, platform, name, aspect_ratio, max_duration_seconds, caption_style, style_preset, is_system_preset, user_id, usage_count, timestamps)
+    - PlatformType type ('youtube_shorts' | 'tiktok' | 'instagram_reels' | 'twitter' | 'linkedin' | 'custom')
+    - AspectRatio type ('9:16' | '16:9' | '1:1' | '4:5' | '4:3' | string)
+    - CaptionStyle interface (font_family, font_size, font_weight, text_color, background_color, stroke_color, position, animation, etc.)
+    - StylePreset type ('minimal' | 'bold' | 'gaming' | 'podcast' | 'vlog' | 'professional' | 'trendy' | 'custom')
+    - CaptionAnimation type ('none' | 'fade' | 'slide' | 'pop' | 'word-by-word')
+    - CropStrategy type ('smart' | 'center' | 'letterbox' | 'blur')
+    - VideoExport interface (id, video_id, template_id, export_url, status, file_size, resolution, duration, timestamps)
+    - ExportStatus type ('processing' | 'completed' | 'failed')
+    - ExportProgress interface (progress, status, current_stage, estimated_time_remaining)
+    - ExportStage type ('extracting' | 'transforming' | 'trimming' | 'adding_captions' | 'encoding' | 'uploading')
+    - ExportConfig interface (template_id, segment_start_time, segment_end_time, crop_strategy, quality, enable_captions)
+    - QualityPreset type ('high' | 'medium' | 'low')
+    - Create file: `frontend/src/types/template.ts` and `frontend/src/types/export.ts`
+  - [ ] 4.4 Create frontend API client functions
+    - getSocialMediaTemplates(params): Fetch templates, returns Promise<{templates: Template[], total: number}>
+    - getTemplate(templateId): Fetch single template, returns Promise<Template>
+    - createTemplate(template): Create custom template, returns Promise<Template>
+    - updateTemplate(templateId, updates): Update template, returns Promise<Template>
+    - deleteTemplate(templateId): Delete template, returns Promise<void>
+    - getSystemPresets(): Fetch system presets, returns Promise<Template[]>
+    - exportVideoWithTemplate(videoId, config): Start export, returns Promise<{job_id: string, export_id: string}>
+    - getVideoExports(videoId, params): Fetch exports, returns Promise<{exports: VideoExport[], total: number}>
+    - getExport(exportId): Fetch single export, returns Promise<VideoExport>
+    - deleteExport(exportId): Delete export, returns Promise<void>
+    - getExportProgress(exportId): Get progress, returns Promise<ExportProgress>
+    - retryExport(exportId): Retry failed export, returns Promise<void>
+    - generateExportPreview(videoId, config): Generate preview, returns Promise<{preview_url: string}>
+    - getTemplateSample(templateId): Get sample video, returns Promise<{sample_url: string}>
+    - All functions use apiClient with proper error handling and TypeScript types
+    - Create or update: `frontend/src/lib/api.ts`
+  - [ ] 4.5 Create TemplateSelector component
+    - Client component for selecting social media template
+    - Props: videoId (string), onTemplateSelect (function), selectedTemplateId (string, optional)
+    - Display system presets as cards with platform logos and themed colors
+    - Each preset card shows: platform logo, name, aspect ratio badge, max duration badge, caption style preview, "Use Template" button
+    - Show user's custom templates in separate section
+    - Create template button: Opens TemplateCreator dialog
+    - Template search and filter: By platform, duration, aspect ratio
+    - Hover effects and selected state highlighting
+    - Shadcn components: Card, Button, Badge, Tabs, Dialog, Input
+    - Responsive: Grid layout on desktop, list on mobile
+    - Create file: `frontend/src/components/templates/TemplateSelector.tsx`
+  - [ ] 4.6 Create PlatformPreview component
+    - Client component showing platform-specific preview
+    - Props: videoId (string), templateId (string), segmentStart (number), segmentEnd (number), cropStrategy (string)
+    - Display video preview in platform aspect ratio with correct dimensions
+    - Mock platform UI overlays (TikTok buttons right, Instagram bottom, YouTube Shorts UI)
+    - Video player centered with aspect ratio maintained
+    - Platform logo in corner, duration indicator
+    - Caption preview showing platform styling
+    - Comparison toggle: "Before" vs "After" preview
+    - Zoom controls for detail viewing
+    - Loading state with skeleton loader
+    - Error state with retry option
+    - Generate preview button triggers API call
+    - Shadcn components: Card, Skeleton, Button, Tabs, AspectRatio
+    - Create file: `frontend/src/components/templates/PlatformPreview.tsx`
+  - [ ] 4.7 Create AspectRatioEditor component
+    - Client component for configuring aspect ratio transformation
+    - Props: videoId (string), targetAspectRatio (string), onStrategyChange (function)
+    - Show current vs target aspect ratio comparison
+    - Strategy selector: Smart Crop, Center Crop, Letterbox, Blur Background
+    - Visual preview for each strategy with highlighted changes
+    - Side-by-side comparison view
+    - Advanced options (collapsible): crop position bias, blur intensity, letterbox color
+    - Face detection toggle for smart crop
+    - Warning messages for significant content loss
+    - Preview button for strategy testing
+    - Shadcn components: RadioGroup, Tabs, Slider, Collapsible, Alert
+    - Create file: `frontend/src/components/templates/AspectRatioEditor.tsx`
+  - [ ] 4.8 Create ExportDialog component
+    - Client component for configuring and starting export
+    - Props: videoId (string), onExportStart (function)
+    - Multi-step dialog: 1) Select template, 2) Select segment, 3) Configure aspect ratio, 4) Preview and confirm
+    - Timeline segment selector with draggable handles and duration counter
+    - Platform duration limit indicator
+    - "Use Highlight" button for auto-select
+    - Export options: quality selector, caption toggle, caption style selector
+    - Export button with loading state during processing
+    - Progress display with stage names and percentage
+    - Estimated time calculation
+    - Error handling with retry button
+    - Success state with download button
+    - Can close and check progress later
+    - Shadcn components: Dialog, Stepper, Button, Slider, Switch, Progress
+    - Create file: `frontend/src/components/templates/ExportDialog.tsx`
+  - [ ] 4.9 Create ExportsList component
+    - Client component displaying all exports for a video
+    - Props: videoId (string)
+    - Fetch exports on mount using getVideoExports
+    - Display as table or card list with: template/platform, timestamp, status badge, file size, resolution, duration, action buttons
+    - Progress bars for in-progress exports
+    - Auto-refresh: poll every 5 seconds for processing exports
+    - Filtering by status, platform, date range
+    - Sorting by created date, status
+    - Bulk actions: delete multiple exports
+    - Empty state: "No exports yet. Create your first export!"
+    - Loading state with skeleton loaders
+    - Export limit warning based on plan
+    - Shadcn components: Table, Badge, Button, Progress, Checkbox, DropdownMenu
+    - Create file: `frontend/src/components/templates/ExportsList.tsx`
+  - [ ] 4.10 Create TemplateCreator component
+    - Client component for creating custom templates
+    - Props: onTemplateCreate (function), initialTemplate (Template, optional for editing)
+    - Form fields: name, platform, aspect ratio, max duration, auto-captions, caption style configuration
+    - Caption style: preset selector or custom (font, size, colors, position)
+    - Live preview of caption style on sample frame
+    - Validation: name required (max 50 chars), valid aspect ratio, duration limits
+    - Save, cancel, reset buttons
+    - Error handling with inline validation messages
+    - Success message on creation
+    - Shadcn components: Dialog, Form, Input, Select, Slider, Switch, ColorPicker, Button
+    - Create file: `frontend/src/components/templates/TemplateCreator.tsx`
+  - [ ] 4.11 Create CaptionStylePreview component
+    - Client component showing caption style preview
+    - Props: captionStyle (CaptionStyle), sampleText (string, optional)
+    - Display sample video frame or static image
+    - Overlay caption with specified style and position
+    - Animate caption if animation style specified
+    - Editable sample text input
+    - Background options: light/dark/colorful for contrast testing
+    - Zoom controls for detail viewing
+    - Platform safe zones overlay
+    - Shadcn components: Card, Input, Tabs
+    - Create file: `frontend/src/components/templates/CaptionStylePreview.tsx`
+  - [ ] 4.12 Create QuickExport component
+    - Client component for one-click export
+    - Props: videoId (string), platform (string)
+    - Single button: "Export to [Platform]" with platform logo
+    - Uses platform's default template automatically
+    - Opens segment selector if video longer than platform limit
+    - Quick confirmation popup
+    - Progress notification via toast
+    - Success/error notifications with actions
+    - Ideal for fast exports without configuration
+    - Shadcn components: Button, Popover, Toast
+    - Create file: `frontend/src/components/templates/QuickExport.tsx`
+  - [ ] 4.13 Ensure UI component tests pass
+    - Run ONLY the tests written in 4.1 and 4.2
+    - Verify all components render correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- The tests written in 4.1 and 4.2 pass
+- All components render correctly
+- TemplateSelector displays presets and custom templates
+- PlatformPreview shows accurate platform representation
+- AspectRatioEditor provides strategy selection and preview
+- ExportDialog manages multi-step export workflow
+- ExportsList displays and manages exports
+- TemplateCreator allows custom template creation
+- QuickExport provides one-click functionality
+- All components integrate with API client functions
+
+### Integration & Testing
+
+#### Task Group 5: Integration with Existing Features and Comprehensive Testing
+**Dependencies:** Task Groups 1-4
+
+- [ ] 5.0 Complete integration and testing
+  - [ ] 5.1 Integrate export functionality into dashboard
+    - Add "Export" dropdown button on video cards
+    - Show platform quick actions (YouTube Shorts, TikTok, Instagram)
+    - Handle export dialog opening from dashboard
+    - Update video card UI to show export status
+  - [ ] 5.2 Integrate export functionality into video editor
+    - Add "Export to Social Media" button in toolbar
+    - Open ExportDialog with current video context
+    - Pass video duration and metadata to export workflow
+  - [ ] 5.3 Integrate export functionality into timeline editor
+    - Add platform icons in timeline header for quick export
+    - Export selected segment when timeline selection exists
+    - Pass segment times to export configuration
+  - [ ] 5.4 Integrate export functionality with highlights
+    - Add "Export as [Platform]" action on highlight cards
+    - Auto-select highlight segment for export
+    - Suggest platform based on highlight duration
+  - [ ] 5.5 Add export settings to user profile
+    - Create "Default Export Settings" section in settings
+    - Allow users to set preferred platforms and quality
+    - Save default caption style preferences
+    - Display export history and usage stats
+  - [ ] 5.6 Write backend integration tests
+    - Test full export workflow: create template → export video → download
+    - Test aspect ratio transformation with various input/output ratios
+    - Test duration enforcement with edge cases (very short, very long)
+    - Test caption overlay with different styles and text lengths
+    - Test template CRUD operations via API with permissions
+    - Test export endpoints with various configurations
+    - Test export queue and concurrent processing limits
+    - Test error handling and retry logic for failed exports
+  - [ ] 5.7 Write frontend integration tests
+    - Test template selection and export dialog workflow
+    - Test export progress tracking and auto-refresh
+    - Test download functionality for completed exports
+    - Test custom template creation and usage
+    - Test quick export with default templates
+    - Test export list filtering and sorting
+  - [ ] 5.8 Write E2E tests for complete user flows
+    - E2E: Upload video → select YouTube Shorts template → configure → export → download
+    - E2E: Upload video → select TikTok template → trim to 60s → export with captions
+    - E2E: Upload video → select Instagram Reels template → apply blur background → export
+    - E2E: Create custom template → use template to export video
+    - E2E: View export list → retry failed export → download completed export
+    - E2E: Quick export to multiple platforms from dashboard
+  - [ ] 5.9 Write performance and quality tests
+    - Performance: Test export speed for 5min, 30min, 60min videos
+    - Performance: Test concurrent exports (multiple users, multiple videos)
+    - Performance: Test preview generation speed
+    - Quality: Verify exported videos meet platform specs (resolution, bitrate, duration)
+    - Quality: Test caption readability at mobile sizes (1080x1920)
+    - Quality: Verify audio quality maintained during re-encoding
+    - Quality: Test color accuracy after transformation
+    - Accessibility: Verify caption contrast meets WCAG AA standards
+  - [ ] 5.10 Write visual regression tests
+    - Test caption style rendering consistency across updates
+    - Test platform preview UI accuracy
+    - Test aspect ratio transformation visual quality
+    - Capture screenshots of all caption presets
+  - [ ] 5.11 Review test coverage and fill gaps
+    - Analyze test coverage for all services, endpoints, components
+    - Identify missing edge cases
+    - Identify missing error handling tests
+    - Write additional strategic tests (up to 15)
+    - Target: >90% coverage for export workflow code
+  - [ ] 5.12 Run feature-specific test suite
+    - Run all social media templates tests (backend + frontend + E2E)
+    - Verify all tests pass
+    - Fix any failing tests
+    - Do NOT run entire application test suite
+  - [ ] 5.13 Perform manual testing
+    - Test export on actual mobile devices (iOS, Android)
+    - Test exported videos on actual platforms (upload to YouTube Shorts, TikTok, Instagram)
+    - Verify platform specifications compliance
+    - Test with various video types (landscape, portrait, square, different lengths)
+    - Test with various content (talking head, gameplay, vlog, podcast)
+    - Gather feedback on caption readability and styling
+
+**Acceptance Criteria:**
+- Export functionality integrated into dashboard, editor, timeline, highlights
+- Export settings available in user profile
+- All integration tests pass
+- All E2E tests pass
+- Performance tests show exports complete in <5 minutes for 30-minute video
+- Quality tests verify 100% platform specification compliance
+- Visual regression tests show consistent caption rendering
+- Test coverage >90% for export workflow code
+- Manual testing confirms exports work on real platforms
+- Smart crop accurately identifies main subject >80% of time
+- Export success rate >95% (excluding user cancellations)
+- Users successfully export to at least one platform within first session (>60% adoption target)
+
+## Execution Order
+1. Database Layer (Task Group 1)
+2. Video Transformation Services (Task Group 2)
+3. API Endpoints and Background Worker (Task Group 3)
+4. Frontend Components (Task Group 4)
+5. Integration & Testing (Task Group 5)

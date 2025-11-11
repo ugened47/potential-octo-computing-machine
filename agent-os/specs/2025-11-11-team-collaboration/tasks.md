@@ -1,0 +1,842 @@
+# Task Breakdown: Team Collaboration
+
+## Overview
+Total Tasks: 6 task groups, 150+ sub-tasks
+
+## Task List
+
+### Database Layer
+
+#### Task Group 1: Database Models and Migrations
+**Dependencies:** User Authentication feature
+
+- [ ] 1.0 Complete database layer
+  - [ ] 1.1 Write 2-8 focused tests for Organization model functionality
+    - Test Organization model creation with required fields (name, slug, owner_id, plan)
+    - Test Organization model validation (name length 2-100 chars, slug uniqueness)
+    - Test Organization model plan enum (free, pro, business)
+    - Test Organization model settings JSONB field storage and retrieval
+    - Test Organization model max_members enforcement based on plan
+    - Test Organization model relationships with owner User
+    - Test Organization model timestamps (created_at, updated_at)
+  - [ ] 1.2 Create Organization model with validations
+    - Fields: id (UUID), name (string, 2-100 chars), slug (string, unique, URL-friendly)
+    - owner_id (foreign key to User), plan (enum: free, pro, business)
+    - max_members (integer, based on plan: free=1, pro=3, business=10)
+    - settings (JSONB: default_permissions, require_approval_for_shares, enable_comments, enable_version_history)
+    - Timestamps: created_at, updated_at
+    - Reuse pattern from: User model in `backend/app/models/user.py`
+  - [ ] 1.3 Create migration for organizations table
+    - Add unique index on slug
+    - Add index on owner_id for fast lookups
+    - Add constraint: name must be unique per owner
+    - Add check constraint: max_members matches plan limits
+  - [ ] 1.4 Write 2-8 focused tests for TeamMember model functionality
+    - Test TeamMember model creation with required fields (organization_id, user_id, role, status)
+    - Test TeamMember model role enum (viewer, editor, admin)
+    - Test TeamMember model status enum (invited, active, suspended)
+    - Test TeamMember model unique constraint (organization_id, user_id)
+    - Test TeamMember model relationships (Organization, User, invited_by User)
+    - Test TeamMember model cascade delete behavior
+    - Test TeamMember model timestamps (invited_at, joined_at, last_active_at)
+  - [ ] 1.5 Create TeamMember model with validations
+    - Fields: id (UUID), organization_id (foreign key to Organization), user_id (foreign key to User)
+    - role (enum: viewer, editor, admin), status (enum: invited, active, suspended)
+    - invited_by (foreign key to User, nullable), invited_at, joined_at, last_active_at
+    - Timestamps: created_at, updated_at
+    - Unique constraint: (organization_id, user_id)
+  - [ ] 1.6 Create migration for team_members table
+    - Add indexes on: organization_id, user_id, role, status
+    - Add unique index on (organization_id, user_id)
+    - Add foreign key constraints with cascade delete
+  - [ ] 1.7 Write 2-8 focused tests for VideoPermission model functionality
+    - Test VideoPermission model creation with video_id and permission_level
+    - Test VideoPermission model organization_id OR user_id constraint (not both)
+    - Test VideoPermission model permission_level enum (view, comment, edit, admin)
+    - Test VideoPermission model expiration (expires_at nullable)
+    - Test VideoPermission model relationships (Video, Organization, User, granted_by User)
+    - Test VideoPermission model composite unique constraints
+  - [ ] 1.8 Create VideoPermission model with validations
+    - Fields: id (UUID), video_id (foreign key to Video), organization_id (nullable), user_id (nullable)
+    - permission_level (enum: view, comment, edit, admin)
+    - granted_by (foreign key to User), granted_at, expires_at (nullable)
+    - Timestamps: created_at, updated_at
+    - Constraint: Either organization_id or user_id must be set (not both)
+    - Composite unique: (video_id, organization_id) or (video_id, user_id)
+  - [ ] 1.9 Create migration for video_permissions table
+    - Add indexes on: video_id, organization_id, user_id, permission_level
+    - Add composite unique indexes
+    - Add check constraint for organization_id XOR user_id
+  - [ ] 1.10 Write 2-8 focused tests for VideoShare model functionality
+    - Test VideoShare model creation with required fields (video_id, shared_by, permission_level, access_type)
+    - Test VideoShare model share_token generation (32 chars, cryptographically secure)
+    - Test VideoShare model access_type enum (direct, link, organization)
+    - Test VideoShare model recipient validation (user_id OR organization_id)
+    - Test VideoShare model expiration handling (expires_at)
+    - Test VideoShare model access tracking (access_count, last_accessed_at)
+    - Test VideoShare model is_active flag and message field
+  - [ ] 1.11 Create VideoShare model with validations
+    - Fields: id (UUID), video_id (foreign key to Video), shared_by (foreign key to User)
+    - shared_with_user_id (nullable), shared_with_organization_id (nullable)
+    - permission_level (enum: view, comment, edit), access_type (enum: direct, link, organization)
+    - share_token (string, unique, 32 chars), expires_at (nullable), is_active (boolean, default true)
+    - access_count (integer, default 0), last_accessed_at (nullable), message (text, nullable)
+    - Timestamps: created_at, updated_at
+    - Constraint: Either shared_with_user_id or shared_with_organization_id must be set
+  - [ ] 1.12 Create migration for video_shares table
+    - Add indexes on: video_id, shared_by, shared_with_user_id, shared_with_organization_id
+    - Add unique index on share_token
+    - Add index on expires_at for cleanup queries
+  - [ ] 1.13 Write 2-8 focused tests for Comment model functionality
+    - Test Comment model creation with required fields (video_id, user_id, timestamp, content)
+    - Test Comment model content validation (1-10000 chars)
+    - Test Comment model parent_comment_id for nested replies (max 3 levels)
+    - Test Comment model mentions array (user IDs)
+    - Test Comment model timestamp and timestamp_end (range comments)
+    - Test Comment model is_resolved, resolved_by, resolved_at
+    - Test Comment model is_edited, edited_at flags
+    - Test Comment model soft delete support
+  - [ ] 1.14 Create Comment model with validations
+    - Fields: id (UUID), video_id (foreign key to Video), user_id (foreign key to User)
+    - parent_comment_id (foreign key to Comment, nullable)
+    - timestamp (float, seconds), timestamp_end (float, nullable)
+    - content (text, 1-10000 chars), mentions (UUID array), attachments (JSONB array)
+    - is_resolved (boolean, default false), resolved_by (nullable), resolved_at (nullable)
+    - is_edited (boolean, default false), edited_at (nullable)
+    - Timestamps: created_at, updated_at
+  - [ ] 1.15 Create migration for comments table
+    - Add indexes on: video_id, user_id, parent_comment_id, timestamp, is_resolved
+    - Add index on created_at DESC for sorting
+    - Support for nested replies (self-referential foreign key)
+  - [ ] 1.16 Write 2-8 focused tests for CommentReaction model functionality
+    - Test CommentReaction model creation with comment_id, user_id, reaction_type
+    - Test CommentReaction model reaction_type enum (like, love, laugh, confused, eyes)
+    - Test CommentReaction model unique constraint (comment_id, user_id)
+    - Test CommentReaction model relationships (Comment, User)
+  - [ ] 1.17 Create CommentReaction model with validations
+    - Fields: id (UUID), comment_id (foreign key to Comment), user_id (foreign key to User)
+    - reaction_type (enum: like, love, laugh, confused, eyes)
+    - Timestamp: created_at
+    - Unique constraint: (comment_id, user_id)
+  - [ ] 1.18 Create migration for comment_reactions table
+    - Add indexes on: comment_id, user_id
+    - Add unique index on (comment_id, user_id)
+  - [ ] 1.19 Write 2-8 focused tests for Version model functionality
+    - Test Version model creation with video_id, version_number, created_by, change_type
+    - Test Version model version_number auto-increment per video
+    - Test Version model change_type enum (upload, edit, export, silence_removal, clip, subtitle, rollback)
+    - Test Version model change_details JSONB structure
+    - Test Version model snapshots (video_metadata, transcript, timeline)
+    - Test Version model is_current flag (only one per video)
+    - Test Version model parent_version_id for rollbacks
+  - [ ] 1.20 Create Version model with validations
+    - Fields: id (UUID), video_id (foreign key to Video), version_number (integer, auto-increment per video)
+    - created_by (foreign key to User), change_type (enum), change_summary (string), change_details (JSONB)
+    - video_metadata_snapshot (JSONB), file_url (string), file_size (bigint), duration (float)
+    - transcript_snapshot (JSONB), timeline_snapshot (JSONB)
+    - parent_version_id (foreign key to Version, nullable), is_current (boolean)
+    - Timestamp: created_at
+    - Unique constraint: (video_id, version_number)
+  - [ ] 1.21 Create migration for versions table
+    - Add indexes on: video_id, version_number DESC, is_current, created_at DESC
+    - Add unique index on (video_id, version_number)
+    - Add foreign key to self for parent_version_id
+  - [ ] 1.22 Write 2-8 focused tests for Notification model functionality
+    - Test Notification model creation with user_id, type, message
+    - Test Notification model type enum (share, comment, mention, version)
+    - Test Notification model related_entity_type and related_entity_id
+    - Test Notification model is_read flag and read_at timestamp
+    - Test Notification model action_url for navigation
+    - Test Notification model relationships with User
+  - [ ] 1.23 Create Notification model with validations
+    - Fields: id (UUID), user_id (foreign key to User)
+    - type (enum: share, comment, mention, version)
+    - related_entity_type (string), related_entity_id (UUID)
+    - title (string), message (text), is_read (boolean, default false)
+    - read_at (nullable), action_url (string)
+    - Timestamp: created_at
+  - [ ] 1.24 Create migration for notifications table
+    - Add indexes on: user_id, is_read, created_at DESC
+    - Add composite index on (user_id, is_read) for filtering
+  - [ ] 1.25 Set up all model associations
+    - Organization has_many TeamMembers
+    - Organization has_many VideoPermissions
+    - User has_many Organizations (as owner)
+    - User has_many TeamMembers
+    - Video has_many VideoPermissions, VideoShares, Comments, Versions
+    - Comment has_many CommentReactions, has_many replies (self-referential)
+    - Version belongs_to parent_version (self-referential)
+  - [ ] 1.26 Ensure database layer tests pass
+    - Run all tests written in 1.1, 1.4, 1.7, 1.10, 1.13, 1.16, 1.19, 1.22
+    - Verify all migrations run successfully
+    - Verify all associations work correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All model tests pass (Organization, TeamMember, VideoPermission, VideoShare, Comment, CommentReaction, Version, Notification)
+- All models pass validation tests
+- All migrations run successfully
+- All associations work correctly
+- All indexes and constraints are created
+
+### Permission and Sharing Services
+
+#### Task Group 2: Permission Service and Sharing Logic
+**Dependencies:** Task Group 1
+
+- [ ] 2.0 Complete permission and sharing services
+  - [ ] 2.1 Write 2-8 focused tests for PermissionService
+    - Test can_view_video checks owner, org admin, org member, direct share, link access
+    - Test can_edit_video checks owner, org admin (for org videos), editor role
+    - Test can_delete_video checks owner, org admin (for org videos)
+    - Test can_comment_on_video checks all view permissions + comment permission
+    - Test can_share_video checks owner, org admin, editor
+    - Test can_manage_organization checks owner and admin roles
+    - Test get_user_role returns correct role for organization
+    - Test permission hierarchy (admin > editor > viewer)
+  - [ ] 2.2 Create PermissionService with core methods
+    - Implement can_view_video(user_id, video_id): Check view permission
+    - Implement can_edit_video(user_id, video_id): Check edit permission
+    - Implement can_delete_video(user_id, video_id): Check delete permission
+    - Implement can_comment_on_video(user_id, video_id): Check comment permission
+    - Implement can_share_video(user_id, video_id): Check share permission
+    - Implement can_manage_organization(user_id, org_id): Check org admin permission
+    - Implement get_user_role(user_id, org_id): Get user's role in organization
+    - Implement get_video_permissions(user_id, video_id): Get all permissions for video
+    - Create file: `backend/app/services/permission.py`
+  - [ ] 2.3 Implement permission resolution logic
+    - Check 1: User is video owner (full access)
+    - Check 2: User is organization admin (full access to org videos)
+    - Check 3: Video shared with user's organization (use org member's role)
+    - Check 4: Video directly shared with user (use share permission level)
+    - Check 5: User has link access via share_token
+    - Default: deny access
+    - Return permission result with reason for debugging
+  - [ ] 2.4 Implement Redis caching for permissions
+    - Cache permission checks with 5 minute TTL
+    - Key format: permission:{user_id}:{video_id}:{permission_type}
+    - Cache get_user_role with 5 minute TTL
+    - Invalidate cache on permission changes (share created/revoked, role changed)
+    - Create cache utility functions: get_cached_permission, set_cached_permission, invalidate_permission_cache
+  - [ ] 2.5 Write 2-8 focused tests for FastAPI permission dependencies
+    - Test require_permission decorator allows access with correct permission
+    - Test require_permission decorator returns 403 with insufficient permission
+    - Test require_permission decorator works with different permission types (view, edit, admin)
+    - Test get_current_user_with_video_access dependency
+    - Test get_current_org_admin dependency
+  - [ ] 2.6 Create FastAPI permission dependencies
+    - Create require_permission(permission: str) decorator
+    - Create get_current_user_with_video_access dependency (checks view permission)
+    - Create get_current_org_admin dependency (checks admin role)
+    - Return 403 Forbidden with clear error message on failure
+    - Create file: `backend/app/api/deps.py` (or extend existing)
+  - [ ] 2.7 Write 2-8 focused tests for sharing service
+    - Test create_video_share creates share with valid data
+    - Test create_video_share generates secure share_token (32 chars)
+    - Test create_video_share validates recipient (user or organization exists)
+    - Test create_video_share creates notification for recipient
+    - Test revoke_share marks share as inactive and notifies recipient
+    - Test access_shared_video validates token and returns video
+    - Test access_shared_video checks expiration and increments access_count
+    - Test access_shared_video validates password for password-protected shares
+  - [ ] 2.8 Create sharing service with core methods
+    - Implement create_video_share(video_id, user_id, data): Create share, generate token, send notification
+    - Implement get_video_shares(video_id, user_id): Get all shares for video (permission check)
+    - Implement revoke_share(share_id, user_id): Mark inactive, notify recipients
+    - Implement access_shared_video(share_token, password): Validate and return video
+    - Implement update_share_access(share_id): Update access_count and last_accessed_at
+    - Implement cleanup_expired_shares(): Background task to deactivate expired shares
+    - Create file: `backend/app/services/sharing.py`
+  - [ ] 2.9 Implement share token generation
+    - Use secrets.token_urlsafe(32) for cryptographically secure tokens
+    - Ensure uniqueness (check existing tokens)
+    - Hash passwords with bcrypt for password-protected shares
+  - [ ] 2.10 Write 2-8 focused tests for notification service
+    - Test create_notification creates notification for user
+    - Test create_share_notification includes share details
+    - Test create_comment_notification includes comment details
+    - Test create_mention_notification includes mention context
+    - Test get_user_notifications returns paginated results
+    - Test mark_notification_read updates is_read and read_at
+    - Test mark_all_notifications_read updates all unread notifications
+  - [ ] 2.11 Create notification service
+    - Implement create_notification(user_id, type, data): Create notification
+    - Implement create_share_notification(share_id): Create notification for video share
+    - Implement create_comment_notification(comment_id): Create notification for comment
+    - Implement create_mention_notification(comment_id, mentioned_user_ids): Create notifications for mentions
+    - Implement get_user_notifications(user_id, filters): Get paginated notifications
+    - Implement mark_notification_read(notification_id, user_id): Mark as read
+    - Implement mark_all_notifications_read(user_id): Mark all as read
+    - Create file: `backend/app/services/notification.py`
+  - [ ] 2.12 Ensure permission and sharing services tests pass
+    - Run all tests written in 2.1, 2.5, 2.7, 2.10
+    - Verify permission resolution logic works correctly
+    - Verify sharing service creates shares and notifications
+    - Verify notification service works correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All permission service tests pass
+- Permission resolution logic correctly handles all access types
+- Redis caching works and improves performance
+- FastAPI dependencies enforce permissions correctly
+- Sharing service creates shares with secure tokens
+- Notification service creates and delivers notifications
+
+### Backend API Endpoints
+
+#### Task Group 3: REST and WebSocket API Endpoints
+**Dependencies:** Task Group 2
+
+- [ ] 3.0 Complete API endpoints
+  - [ ] 3.1 Write 2-8 focused tests for Organization API endpoints
+    - Test POST /api/organizations creates organization and makes user owner
+    - Test GET /api/organizations returns user's organizations
+    - Test GET /api/organizations/{id} returns organization details
+    - Test PATCH /api/organizations/{id} updates organization (admin only)
+    - Test DELETE /api/organizations/{id} deletes organization (owner only)
+    - Test DELETE /api/organizations/{id} returns 403 for non-owner
+    - Test POST /api/organizations validates name length and slug uniqueness
+  - [ ] 3.2 Create Pydantic schemas for Organization
+    - OrganizationCreate schema (name, slug optional, plan)
+    - OrganizationUpdate schema (name, settings)
+    - OrganizationResponse schema (all fields including member_count)
+    - OrganizationSettings schema (nested)
+    - Create file: `backend/app/schemas/organization.py`
+  - [ ] 3.3 Implement Organization API endpoints
+    - POST /api/organizations: Create organization (auto-add owner as admin)
+    - GET /api/organizations: List user's organizations
+    - GET /api/organizations/{id}: Get organization details
+    - PATCH /api/organizations/{id}: Update organization (admin only)
+    - DELETE /api/organizations/{id}: Delete organization (owner only, with confirmation)
+    - Create file: `backend/app/api/routes/organizations.py`
+  - [ ] 3.4 Write 2-8 focused tests for TeamMember API endpoints
+    - Test POST /api/organizations/{id}/members invites member (admin only)
+    - Test GET /api/organizations/{id}/members returns team members with filters
+    - Test PATCH /api/organizations/{id}/members/{member_id} updates role (admin only)
+    - Test DELETE /api/organizations/{id}/members/{member_id} removes member (admin only)
+    - Test POST /api/organizations/{id}/accept-invitation accepts invitation
+    - Test invite email is sent when creating team member
+    - Test cannot remove organization owner
+  - [ ] 3.5 Create Pydantic schemas for TeamMember
+    - TeamMemberInvite schema (email, role)
+    - TeamMemberUpdate schema (role, status)
+    - TeamMemberResponse schema (all fields including user info)
+    - InvitationAccept schema (invitation_token)
+    - Create file: `backend/app/schemas/team_member.py`
+  - [ ] 3.6 Implement TeamMember API endpoints
+    - POST /api/organizations/{id}/members: Invite member (send email, create pending)
+    - GET /api/organizations/{id}/members: List members (with filters: status, role)
+    - GET /api/organizations/{id}/members/{member_id}: Get member details
+    - PATCH /api/organizations/{id}/members/{member_id}: Update member (role, status)
+    - DELETE /api/organizations/{id}/members/{member_id}: Remove member (revoke permissions)
+    - POST /api/organizations/{id}/accept-invitation: Accept invitation (update status to active)
+    - Create file: `backend/app/api/routes/team_members.py`
+  - [ ] 3.7 Write 2-8 focused tests for VideoShare API endpoints
+    - Test POST /api/videos/{id}/share creates share with token
+    - Test POST /api/videos/{id}/share validates recipients (user or org exists)
+    - Test GET /api/videos/{id}/shares returns shares for video
+    - Test PATCH /api/shares/{share_id} updates share (permission level, expiration)
+    - Test DELETE /api/shares/{share_id} revokes share
+    - Test GET /api/shares/token/{share_token} accesses video via link
+    - Test GET /api/shares/token/{share_token} validates password if required
+    - Test GET /api/shares/token/{share_token} increments access_count
+  - [ ] 3.8 Create Pydantic schemas for VideoShare
+    - VideoShareCreate schema (shared_with_user_id, shared_with_organization_id, permission_level, access_type, expires_at, message, require_password, password)
+    - VideoShareUpdate schema (permission_level, expires_at, is_active)
+    - VideoShareResponse schema (all fields including recipient info)
+    - ShareAccessRequest schema (password optional)
+    - ShareAccessResponse schema (video, access_token)
+    - Create file: `backend/app/schemas/video_share.py`
+  - [ ] 3.9 Implement VideoShare API endpoints
+    - POST /api/videos/{id}/share: Create share, generate token, send notifications
+    - GET /api/videos/{id}/shares: List shares for video
+    - GET /api/shares/{share_id}: Get share details
+    - PATCH /api/shares/{share_id}: Update share
+    - DELETE /api/shares/{share_id}: Revoke share (mark inactive, notify)
+    - GET /api/shares/token/{share_token}: Access video via share link (validate, increment count)
+    - Create file: `backend/app/api/routes/video_shares.py`
+  - [ ] 3.10 Write 2-8 focused tests for Comment API endpoints
+    - Test POST /api/videos/{id}/comments creates comment with mentions
+    - Test POST /api/videos/{id}/comments broadcasts via WebSocket
+    - Test GET /api/videos/{id}/comments returns comments with filters
+    - Test GET /api/videos/{id}/comments returns nested replies
+    - Test PATCH /api/comments/{id} updates comment (author or admin only)
+    - Test DELETE /api/comments/{id} soft deletes comment (author or admin only)
+    - Test POST /api/comments/{id}/reactions adds/removes reaction
+  - [ ] 3.11 Create Pydantic schemas for Comment
+    - CommentCreate schema (timestamp, timestamp_end, content, parent_comment_id)
+    - CommentUpdate schema (content, is_resolved)
+    - CommentResponse schema (all fields including user, mentions, reactions, replies)
+    - CommentReactionCreate schema (reaction_type)
+    - ReactionCounts schema (like, love, laugh, confused, eyes, user_reaction)
+    - Create file: `backend/app/schemas/comment.py`
+  - [ ] 3.12 Implement Comment API endpoints
+    - POST /api/videos/{id}/comments: Create comment, parse mentions, send notifications, broadcast
+    - GET /api/videos/{id}/comments: List comments with filters (timestamp_range, is_resolved, user_id)
+    - GET /api/comments/{id}: Get comment with full thread
+    - PATCH /api/comments/{id}: Update comment (set is_edited flag)
+    - DELETE /api/comments/{id}: Soft delete comment
+    - POST /api/comments/{id}/reactions: Add/remove reaction (toggle)
+    - Create file: `backend/app/api/routes/comments.py`
+  - [ ] 3.13 Implement comment mention parsing
+    - Parse @mentions in comment content (regex for @username)
+    - Validate mentioned users have access to video
+    - Store mentioned user IDs in mentions array
+    - Create notifications for mentioned users
+    - Highlight mentions in API response
+  - [ ] 3.14 Write 2-8 focused tests for Version API endpoints
+    - Test GET /api/videos/{id}/versions returns version history
+    - Test GET /api/versions/{id} returns version details
+    - Test POST /api/videos/{id}/versions/rollback creates new version
+    - Test POST /api/videos/{id}/versions/rollback restores state from snapshot
+    - Test GET /api/versions/{id}/diff compares two versions
+    - Test GET /api/versions/{id}/download returns presigned URL
+  - [ ] 3.15 Create Pydantic schemas for Version
+    - VersionResponse schema (all fields including creator info)
+    - VersionRollback schema (version_id)
+    - VersionDiff schema (version1, version2, metadata_changes, timeline_changes, transcript_changes)
+    - MetadataChange schema (field, old_value, new_value, change_type)
+    - Create file: `backend/app/schemas/version.py`
+  - [ ] 3.16 Implement Version API endpoints
+    - GET /api/videos/{id}/versions: List versions (paginated, desc by version_number)
+    - GET /api/versions/{id}: Get version details with full metadata
+    - POST /api/videos/{id}/versions/rollback: Rollback to version (create new version with parent_id)
+    - GET /api/versions/{id}/diff: Compare versions and return detailed diff
+    - GET /api/versions/{id}/download: Generate presigned S3 URL for version file
+    - Create file: `backend/app/api/routes/versions.py`
+  - [ ] 3.17 Implement version creation helper
+    - Create create_version helper function in services
+    - Capture video_metadata_snapshot, transcript_snapshot, timeline_snapshot
+    - Auto-increment version_number per video
+    - Set is_current to true, unset for previous versions
+    - Create file: `backend/app/services/version.py`
+  - [ ] 3.18 Write 2-8 focused tests for Notification API endpoints
+    - Test GET /api/notifications returns user's notifications with filters
+    - Test GET /api/notifications paginates results correctly
+    - Test PATCH /api/notifications/{id}/read marks as read
+    - Test POST /api/notifications/mark-all-read marks all as read
+    - Test DELETE /api/notifications/{id} deletes notification
+  - [ ] 3.19 Create Pydantic schemas for Notification
+    - NotificationResponse schema (all fields)
+    - NotificationFilters schema (type, is_read)
+    - MarkAllReadResponse schema (count)
+    - Create file: `backend/app/schemas/notification.py`
+  - [ ] 3.20 Implement Notification API endpoints
+    - GET /api/notifications: List user notifications (with filters: type, is_read, pagination)
+    - PATCH /api/notifications/{id}/read: Mark notification as read
+    - POST /api/notifications/mark-all-read: Mark all as read
+    - DELETE /api/notifications/{id}: Delete notification
+    - Create file: `backend/app/api/routes/notifications.py`
+  - [ ] 3.21 Write 2-8 focused tests for Presence API endpoints
+    - Test GET /api/videos/{id}/presence returns active users
+    - Test POST /api/videos/{id}/presence updates user presence
+    - Test presence TTL expires after 30 seconds
+    - Test presence updates are stored in Redis
+  - [ ] 3.22 Create Pydantic schemas for Presence
+    - PresenceUser schema (user_id, user, status, last_seen)
+    - PresenceUpdate schema (status: viewing, editing, idle)
+    - Create file: `backend/app/schemas/presence.py`
+  - [ ] 3.23 Implement Presence API endpoints
+    - GET /api/videos/{id}/presence: Get active users (from Redis)
+    - POST /api/videos/{id}/presence: Update presence (store in Redis with 30s TTL)
+    - Create file: `backend/app/api/routes/presence.py`
+  - [ ] 3.24 Implement presence tracking in Redis
+    - Store presence with key: presence:{video_id}:{user_id}
+    - Value: {status, last_seen}
+    - TTL: 30 seconds (require heartbeat to maintain)
+    - Cleanup expired presence on get
+  - [ ] 3.25 Write 2-8 focused tests for Audit Log API endpoints
+    - Test GET /api/organizations/{id}/audit-logs returns logs (admin only)
+    - Test audit logs capture user, action, resource, timestamp
+    - Test audit logs filter by user_id, action_type, date_range
+    - Test audit logs pagination works correctly
+  - [ ] 3.26 Create AuditLog model and schema
+    - AuditLog model: id, organization_id, user_id, action_type, resource_type, resource_id, details (JSONB), ip_address, user_agent, timestamp
+    - AuditLogResponse schema
+    - AuditLogFilters schema (user_id, action_type, date_range)
+    - Create file: `backend/app/models/audit_log.py` and `backend/app/schemas/audit_log.py`
+  - [ ] 3.27 Implement Audit Log API endpoint
+    - GET /api/organizations/{id}/audit-logs: List audit logs (admin only, with filters)
+    - Create audit logging helper: log_audit_event(org_id, user_id, action, resource)
+    - Create file: `backend/app/api/routes/audit_logs.py` and `backend/app/services/audit_log.py`
+  - [ ] 3.28 Integrate audit logging in all state-changing operations
+    - Log: member_added, member_removed, role_changed, video_shared, video_deleted, settings_changed
+    - Call log_audit_event in relevant endpoints
+  - [ ] 3.29 Write 2-8 focused tests for WebSocket connection
+    - Test WebSocket connection authenticates with JWT token
+    - Test WebSocket connection subscribes to video
+    - Test WebSocket connection handles ping/pong heartbeat
+    - Test WebSocket connection broadcasts messages to other users
+    - Test WebSocket connection disconnects idle connections after 10 minutes
+  - [ ] 3.30 Implement WebSocket server
+    - Set up FastAPI WebSocket endpoint: ws://api/ws/videos/{video_id}
+    - Authenticate connection with JWT token (query param or initial message)
+    - Track connections per video in memory or Redis
+    - Implement heartbeat: ping/pong every 30s
+    - Auto-disconnect idle connections after 10 minutes
+    - Create file: `backend/app/api/routes/websocket.py`
+  - [ ] 3.31 Implement WebSocket message handling
+    - Handle client messages: subscribe, unsubscribe, presence_update, comment_typing, ping
+    - Send server messages: comment_created, comment_updated, comment_deleted, presence_update, video_updated, notification, pong
+    - Validate message types and payloads
+    - Rate limit messages (100/minute per connection)
+  - [ ] 3.32 Implement broadcasting service
+    - Create broadcast_to_video(video_id, message): Send to all users viewing video
+    - Create broadcast_to_user(user_id, message): Send to specific user (all connections)
+    - Create broadcast_to_organization(org_id, message): Send to all org members
+    - Use Redis pub/sub for multi-server coordination
+    - Create file: `backend/app/services/broadcast.py`
+  - [ ] 3.33 Ensure API endpoints tests pass
+    - Run all tests written in 3.1, 3.4, 3.7, 3.10, 3.14, 3.18, 3.21, 3.25, 3.29
+    - Verify all endpoints work correctly
+    - Verify WebSocket connection and message handling works
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All API endpoint tests pass
+- Organization, TeamMember, VideoShare, Comment, Version, Notification, Presence, AuditLog endpoints work
+- WebSocket server handles connections and messages
+- Broadcasting service sends messages to appropriate users
+- All endpoints enforce permissions correctly
+- Audit logging captures all state changes
+
+### Frontend Components
+
+#### Task Group 4: Team Collaboration UI Components
+**Dependencies:** Task Group 3
+
+- [ ] 4.0 Complete team collaboration UI components
+  - [ ] 4.1 Write 2-8 focused tests for team components
+    - Test OrganizationManager renders organizations list
+    - Test OrganizationManager creates new organization
+    - Test TeamMembersPanel renders team members table
+    - Test TeamMembersPanel invites new member (admin only)
+    - Test ShareModal shares video with user/org/link
+    - Test CommentsPanel displays comments and replies
+    - Test CommentForm creates comment with mentions
+    - Test VersionHistory displays version list and rollback
+  - [ ] 4.2 Create TypeScript type definitions for team collaboration
+    - Organization interface (id, name, slug, owner_id, plan, max_members, settings, timestamps)
+    - OrganizationSettings interface (default_permissions, require_approval_for_shares, enable_comments, enable_version_history)
+    - TeamMember interface (id, organization_id, user_id, user, role, status, timestamps)
+    - VideoPermission interface (id, video_id, organization_id, user_id, permission_level, granted_by, granted_at, expires_at, timestamps)
+    - VideoShare interface (id, video_id, shared_by, shared_with_user_id, shared_with_user, shared_with_organization_id, shared_with_organization, permission_level, access_type, share_token, expires_at, is_active, access_count, last_accessed_at, message, timestamps)
+    - Comment interface (id, video_id, user_id, user, parent_comment_id, replies, timestamp, timestamp_end, content, mentions, mentioned_users, attachments, is_resolved, resolved_by, resolved_at, is_edited, edited_at, reactions, timestamps)
+    - CommentAttachment interface (id, filename, url, mime_type, size)
+    - ReactionCounts interface (like, love, laugh, confused, eyes, user_reaction)
+    - ReactionType type (like | love | laugh | confused | eyes)
+    - Version interface (id, video_id, version_number, created_by, creator, change_type, change_summary, change_details, video_metadata_snapshot, file_url, file_size, duration, transcript_snapshot, timeline_snapshot, parent_version_id, is_current, created_at)
+    - ChangeType type (upload | edit | export | silence_removal | clip | subtitle | rollback)
+    - VersionDiff interface (version1, version2, metadata_changes, timeline_changes, transcript_changes)
+    - Notification interface (id, user_id, type, related_entity_type, related_entity_id, title, message, is_read, read_at, action_url, created_at)
+    - PresenceUser interface (user_id, user, status, last_seen)
+    - PermissionLevel type (view | comment | edit | admin)
+    - Create files: `frontend/src/types/organization.ts`, `frontend/src/types/team.ts`, `frontend/src/types/comment.ts`, `frontend/src/types/version.ts`, `frontend/src/types/notification.ts`, `frontend/src/types/presence.ts`
+  - [ ] 4.3 Create frontend API client functions for organizations
+    - createOrganization(data): Promise<Organization>
+    - getOrganizations(): Promise<Organization[]>
+    - getOrganization(id): Promise<Organization>
+    - updateOrganization(id, data): Promise<Organization>
+    - deleteOrganization(id): Promise<void>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.4 Create frontend API client functions for team members
+    - inviteTeamMember(orgId, data): Promise<TeamMember>
+    - getTeamMembers(orgId, params): Promise<TeamMember[]>
+    - getTeamMember(orgId, memberId): Promise<TeamMember>
+    - updateTeamMember(orgId, memberId, data): Promise<TeamMember>
+    - removeTeamMember(orgId, memberId): Promise<void>
+    - acceptInvitation(token): Promise<TeamMember>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.5 Create frontend API client functions for video sharing
+    - shareVideo(videoId, data): Promise<VideoShare>
+    - getVideoShares(videoId): Promise<VideoShare[]>
+    - getShare(shareId): Promise<VideoShare>
+    - updateShare(shareId, data): Promise<VideoShare>
+    - revokeShare(shareId): Promise<void>
+    - accessSharedVideo(token, password): Promise<{video: Video, access_token: string}>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.6 Create frontend API client functions for comments
+    - createComment(videoId, data): Promise<Comment>
+    - getComments(videoId, params): Promise<Comment[]>
+    - getComment(id): Promise<Comment>
+    - updateComment(id, data): Promise<Comment>
+    - deleteComment(id): Promise<void>
+    - addReaction(commentId, type): Promise<ReactionCounts>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.7 Create frontend API client functions for versions
+    - getVersions(videoId, params): Promise<Version[]>
+    - getVersion(id): Promise<Version>
+    - rollbackToVersion(videoId, versionId): Promise<Version>
+    - compareVersions(versionId, compareToId): Promise<VersionDiff>
+    - downloadVersion(id): Promise<{url: string}>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.8 Create frontend API client functions for notifications
+    - getNotifications(params): Promise<Notification[]>
+    - markNotificationRead(id): Promise<Notification>
+    - markAllNotificationsRead(): Promise<{count: number}>
+    - deleteNotification(id): Promise<void>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.9 Create frontend API client functions for permissions
+    - checkVideoPermission(videoId, permission): Promise<{allowed: boolean}>
+    - getUserRole(orgId): Promise<{role: string}>
+    - getVideoPermissions(videoId): Promise<VideoPermission[]>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.10 Create frontend API client functions for presence
+    - getActiveUsers(videoId): Promise<PresenceUser[]>
+    - updatePresence(videoId, status): Promise<void>
+    - Update file: `frontend/src/lib/api.ts`
+  - [ ] 4.11 Create TeamContext for state management
+    - State: currentOrganization, organizations, teamMembers, userRole
+    - Actions: setCurrentOrganization, fetchOrganizations, fetchTeamMembers, inviteMember, updateMember, removeMember
+    - Use React Context API
+    - Persist currentOrganization in localStorage
+    - Create file: `frontend/src/contexts/TeamContext.tsx`
+  - [ ] 4.12 Create PermissionsContext for caching
+    - State: videoPermissions (Map), organizationRoles (Map)
+    - Actions: checkPermission, refreshPermissions, clearCache
+    - Cache with 5 minute TTL
+    - Create file: `frontend/src/contexts/PermissionsContext.tsx`
+  - [ ] 4.13 Create CommentsContext for real-time updates
+    - State: comments (array), activeFilters, unreadCount
+    - Actions: addComment, updateComment, deleteComment, resolveComment, addReaction
+    - WebSocket integration for real-time updates
+    - Optimistic updates
+    - Create file: `frontend/src/contexts/CommentsContext.tsx`
+  - [ ] 4.14 Create OrganizationManager component
+    - Client component ('use client')
+    - Props: None (fetches from context)
+    - Features: List orgs, create org, switch org, view details, delete (owner only)
+    - Layout: Card grid or list with org name, plan, member count
+    - Create file: `frontend/src/components/team/OrganizationManager.tsx`
+  - [ ] 4.15 Create TeamMembersPanel component
+    - Client component ('use client')
+    - Props: organizationId (string)
+    - Features: List members, invite, update role, remove, search/filter
+    - Table layout with role badges (color-coded)
+    - Create file: `frontend/src/components/team/TeamMembersPanel.tsx`
+  - [ ] 4.16 Create ShareModal component
+    - Client component ('use client')
+    - Props: videoId (string), onShare (function, optional)
+    - Features: Share with user/org, generate link, set permissions/expiration, list active shares
+    - Tabs: Share with User, Share with Team, Share Link, Active Shares
+    - Create file: `frontend/src/components/team/ShareModal.tsx`
+  - [ ] 4.17 Create CommentsPanel component
+    - Client component ('use client')
+    - Props: videoId (string), currentTime (number), onSeek (function)
+    - Features: List comments, filter, real-time updates, highlight current time's comments
+    - Create file: `frontend/src/components/team/CommentsPanel.tsx`
+  - [ ] 4.18 Create CommentThread component
+    - Client component ('use client')
+    - Props: comment (Comment), onReply, onEdit, onDelete, onResolve, onReact
+    - Features: Display comment with replies, reactions, mention highlighting
+    - Nested replies indented (max 3 levels)
+    - Create file: `frontend/src/components/team/CommentThread.tsx`
+  - [ ] 4.19 Create CommentForm component
+    - Client component ('use client')
+    - Props: videoId, timestamp, parentCommentId (optional), editComment (optional), onSubmit, onCancel
+    - Features: Textarea with mention autocomplete, character count, timestamp display
+    - Keyboard shortcuts: Ctrl+Enter to submit, Esc to cancel
+    - Create file: `frontend/src/components/team/CommentForm.tsx`
+  - [ ] 4.20 Create VersionHistory component
+    - Client component ('use client')
+    - Props: videoId (string), onRestore (function, optional)
+    - Features: List versions, view details, compare, restore, download
+    - Visual timeline connecting versions
+    - Create file: `frontend/src/components/team/VersionHistory.tsx`
+  - [ ] 4.21 Create VersionDiff component
+    - Client component ('use client')
+    - Props: videoId, version1, version2
+    - Features: Side-by-side comparison, highlight differences
+    - Tabs: Overview, Timeline, Transcript, Metadata
+    - Create file: `frontend/src/components/team/VersionDiff.tsx`
+  - [ ] 4.22 Create ActiveUsers component
+    - Client component ('use client')
+    - Props: videoId (string)
+    - Features: Display active users' avatars, real-time presence updates
+    - Layout: Horizontal avatar stack with overlap
+    - Create file: `frontend/src/components/team/ActiveUsers.tsx`
+  - [ ] 4.23 Create NotificationBell component
+    - Client component ('use client')
+    - Props: None
+    - Features: Bell icon with unread count, dropdown with notification list, mark as read
+    - Real-time updates via WebSocket
+    - Create file: `frontend/src/components/team/NotificationBell.tsx`
+  - [ ] 4.24 Create PermissionGuard component
+    - Client component ('use client')
+    - Props: requiredPermission, videoId (optional), organizationId (optional), fallback, children
+    - Features: Check permission, render children if allowed, fallback if denied
+    - Cache permission results
+    - Create file: `frontend/src/components/team/PermissionGuard.tsx`
+  - [ ] 4.25 Ensure UI component tests pass
+    - Run all tests written in 4.1
+    - Verify all components render correctly
+    - Verify state management works correctly
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- All UI component tests pass
+- All type definitions are complete and correct
+- All API client functions work correctly
+- All contexts manage state correctly
+- All components render correctly and handle user interactions
+- Permission-based rendering works (PermissionGuard)
+
+### Real-time Collaboration
+
+#### Task Group 5: WebSocket Integration
+**Dependencies:** Task Group 3, Task Group 4
+
+- [ ] 5.0 Complete WebSocket integration
+  - [ ] 5.1 Write 2-8 focused tests for WebSocket hook
+    - Test useWebSocket hook connects on mount
+    - Test useWebSocket hook disconnects on unmount
+    - Test useWebSocket hook handles reconnection with exponential backoff
+    - Test useWebSocket hook receives messages and updates state
+    - Test useWebSocket hook sends presence updates every 30s
+    - Test useWebSocket hook handles connection errors
+  - [ ] 5.2 Create useWebSocket hook
+    - Auto-connect when viewing video
+    - Handle authentication (JWT token)
+    - Implement reconnection with exponential backoff
+    - Send presence updates every 30s (heartbeat)
+    - Handle incoming messages (comment_created, comment_updated, presence_update, etc.)
+    - Cleanup on unmount
+    - Create file: `frontend/src/hooks/useWebSocket.ts`
+  - [ ] 5.3 Implement WebSocket message handlers
+    - Handle comment_created: Add to comments state, show notification
+    - Handle comment_updated: Update comment in state
+    - Handle comment_deleted: Remove from state
+    - Handle presence_update: Update active users list
+    - Handle video_updated: Refresh video data
+    - Handle notification: Show notification, update count
+    - Handle pong: Update heartbeat
+  - [ ] 5.4 Integrate WebSocket with CommentsContext
+    - Connect useWebSocket hook in CommentsContext
+    - Update comments state on WebSocket messages
+    - Broadcast comment creation to WebSocket
+    - Show optimistic updates before WebSocket confirmation
+  - [ ] 5.5 Integrate WebSocket with ActiveUsers component
+    - Connect useWebSocket hook in ActiveUsers component
+    - Update active users on presence_update messages
+    - Send presence updates every 30s
+  - [ ] 5.6 Integrate WebSocket with NotificationBell component
+    - Connect useWebSocket hook in NotificationBell component
+    - Update unread count on notification messages
+    - Show toast/banner for new notifications
+  - [ ] 5.7 Implement connection status indicator
+    - Show connection status (connected, connecting, disconnected)
+    - Show reconnection attempts
+    - Display in app header or video editor
+    - Create file: `frontend/src/components/team/ConnectionStatus.tsx`
+  - [ ] 5.8 Ensure WebSocket integration tests pass
+    - Run all tests written in 5.1
+    - Verify WebSocket connects and disconnects correctly
+    - Verify messages are received and handled
+    - Do NOT run the entire test suite at this stage
+
+**Acceptance Criteria:**
+- useWebSocket hook connects, disconnects, and reconnects correctly
+- All WebSocket message types are handled correctly
+- Real-time updates work for comments, presence, notifications
+- Connection status is displayed correctly
+- Optimistic updates provide good UX
+
+### Integration & Testing
+
+#### Task Group 6: Integration and End-to-End Testing
+**Dependencies:** Task Groups 1-5
+
+- [ ] 6.0 Complete integration and E2E testing
+  - [ ] 6.1 Write integration tests for full collaboration workflow
+    - Test: Create organization → Invite member → Share video → Add comments → View versions
+    - Test: Organization admin manages members and permissions
+    - Test: Editor shares video with team and external user
+    - Test: Viewer adds comments and mentions team member
+    - Test: User receives notifications for shares and mentions
+    - Test: User views version history and rollbacks to previous version
+  - [ ] 6.2 Write integration tests for permission enforcement
+    - Test: Viewer cannot edit video (403)
+    - Test: Non-member cannot view organization video (403)
+    - Test: Admin can manage all organization videos
+    - Test: Share link grants access to non-authenticated user
+    - Test: Expired share link denies access
+  - [ ] 6.3 Write E2E tests for UI workflows
+    - Test: User creates organization via OrganizationManager
+    - Test: Admin invites member via TeamMembersPanel
+    - Test: User shares video via ShareModal
+    - Test: User adds comment via CommentForm and sees it in CommentsPanel
+    - Test: User replies to comment and mentions another user
+    - Test: User resolves comment
+    - Test: User views VersionHistory and restores previous version
+    - Test: User sees ActiveUsers in real-time
+    - Test: User receives notification in NotificationBell
+  - [ ] 6.4 Write E2E tests for real-time collaboration
+    - Test: Two users view same video, see each other in ActiveUsers
+    - Test: User 1 adds comment, User 2 sees it instantly via WebSocket
+    - Test: User 1 mentions User 2, User 2 receives notification
+    - Test: User 1 edits video, User 2 sees new version in VersionHistory
+  - [ ] 6.5 Write security tests
+    - Test: Unauthorized access attempts return 403
+    - Test: SQL injection in comment content is prevented
+    - Test: XSS in comment mentions is prevented
+    - Test: CSRF protection on state-changing operations
+    - Test: Share token brute-force protection (rate limiting)
+    - Test: Rate limiting on invitations, shares, comments
+  - [ ] 6.6 Write load tests
+    - Test: 100+ concurrent WebSocket connections per video
+    - Test: 10+ users commenting simultaneously
+    - Test: 1000+ permission checks per second (with caching)
+    - Test: Version history with 100+ versions loads quickly
+  - [ ] 6.7 Write performance tests
+    - Test: Permission check completes in <100ms (cached)
+    - Test: Comment creation completes in <200ms
+    - Test: WebSocket message delivery in <100ms
+    - Test: Version list loads in <1 second for 30 versions
+    - Test: Page with comments panel loads in <2 seconds
+  - [ ] 6.8 Test video editor integration
+    - Test: Comments panel appears in video editor
+    - Test: Comment markers appear on timeline at correct timestamps
+    - Test: Clicking comment marker seeks video and highlights comment
+    - Test: Share button in video editor opens ShareModal
+    - Test: ActiveUsers component in editor header
+    - Test: Version indicator shows current version number
+  - [ ] 6.9 Test dashboard integration
+    - Test: "Shared with me" section in video list
+    - Test: Share icon and count on video cards
+    - Test: Organization badge on organization-owned videos
+    - Test: Filter videos by: My Videos, Shared with Me, Organization Videos
+    - Test: Bulk share action for multiple videos
+  - [ ] 6.10 Test notification integration
+    - Test: NotificationBell in main app header
+    - Test: Unread count badge updates in real-time
+    - Test: Email notifications for important events (share, mention, invitation)
+    - Test: Notification preferences page
+  - [ ] 6.11 Run full test suite
+    - Run all backend tests (pytest)
+    - Run all frontend tests (Vitest)
+    - Run all E2E tests (Playwright)
+    - Verify >85% backend coverage
+    - Verify >80% frontend coverage
+  - [ ] 6.12 Fix any test failures or bugs discovered
+    - Debug and fix failing tests
+    - Fix any bugs found during testing
+    - Re-run tests until all pass
+
+**Acceptance Criteria:**
+- All integration tests pass
+- All E2E tests pass (full workflows work end-to-end)
+- All security tests pass (no critical vulnerabilities)
+- All load tests pass (system handles expected load)
+- All performance tests pass (meets performance requirements)
+- All integration points work correctly (editor, dashboard, notifications)
+- Test coverage >85% backend, >80% frontend
+- No critical bugs remain
+
+## Execution Order
+1. Database Layer (Task Group 1) - Create all models and migrations
+2. Permission and Sharing Services (Task Group 2) - Implement business logic
+3. Backend API Endpoints (Task Group 3) - Create REST and WebSocket APIs
+4. Frontend Components (Task Group 4) - Build UI components and state management
+5. Real-time Collaboration (Task Group 5) - Integrate WebSocket for real-time features
+6. Integration & Testing (Task Group 6) - Comprehensive testing and bug fixes

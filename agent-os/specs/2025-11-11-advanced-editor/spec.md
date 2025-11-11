@@ -1,0 +1,1038 @@
+# Specification: Advanced Editor
+
+## Goal
+Enable users to create professional multi-track video compositions by combining multiple video layers, images, overlays, text, transitions, and background music in an intuitive timeline interface, with real-time preview and high-quality export capabilities.
+
+## User Stories
+- As a content creator, I want to overlay images and text on my videos so that I can add branding, logos, and annotations without external tools
+- As a video editor, I want to combine multiple video clips on different tracks so that I can create picture-in-picture effects and multi-camera compositions
+- As a podcaster, I want to add background music that fades in/out so that my content is more engaging without overpowering the speech
+- As a YouTuber, I want to add smooth transitions between clips so that my video looks professional
+- As a marketer, I want to layer animated overlays and graphics so that I can create polished promotional videos
+- As a user, I want to preview my multi-track composition in real-time so that I can see exactly how the final video will look
+- As a user, I want to control the z-index (stacking order) of tracks so that I can arrange elements exactly as needed
+- As a user, I want to adjust volume levels for multiple audio tracks independently so that I can achieve the perfect mix
+
+## Specific Requirements
+
+### Project Model & Database
+- Create Project model representing a multi-track composition
+- Fields:
+  - id (UUID, primary key)
+  - user_id (UUID, foreign key to users)
+  - name (string, 255 chars, required) - project name
+  - description (text, optional) - project description
+  - video_id (UUID, foreign key to videos, optional) - base video if starting from existing video
+  - width (integer, pixels) - output video width (e.g., 1920)
+  - height (integer, pixels) - output video height (e.g., 1080)
+  - frame_rate (float) - output frame rate (e.g., 30, 60)
+  - duration_seconds (float) - total project duration
+  - background_color (string, hex color) - background color for transparent areas (e.g., "#000000")
+  - canvas_settings (JSON) - additional canvas settings (aspect_ratio, etc.)
+  - export_settings (JSON) - default export settings (codec, bitrate, quality)
+  - thumbnail_url (string, S3 URL) - project preview thumbnail
+  - status (enum: 'draft', 'rendering', 'completed', 'error')
+  - last_rendered_at (timestamp, nullable) - when project was last rendered
+  - render_output_url (string, S3 URL, nullable) - URL of last rendered output
+  - created_at (timestamp)
+  - updated_at (timestamp)
+- Indexes: user_id, status, created_at DESC
+- Create migration: `alembic revision --autogenerate -m "Add Project model for multi-track editor"`
+
+### Track Model & Database
+- Create Track model representing individual timeline tracks (video, audio, image, text layers)
+- Fields:
+  - id (UUID, primary key)
+  - project_id (UUID, foreign key to projects, cascade delete)
+  - track_type (enum: 'video', 'audio', 'image', 'text', 'overlay')
+  - name (string, 255 chars) - user-defined track name (e.g., "Main Video", "Background Music")
+  - z_index (integer) - stacking order (higher = on top, 0 = bottom)
+  - is_locked (boolean, default false) - prevent editing
+  - is_visible (boolean, default true) - show/hide track
+  - is_muted (boolean, default false) - mute audio tracks
+  - volume (float, 0.0-1.0, default 1.0) - track volume level
+  - opacity (float, 0.0-1.0, default 1.0) - track opacity/alpha
+  - blend_mode (enum: 'normal', 'multiply', 'screen', 'overlay', default 'normal')
+  - track_order (integer) - order in track list UI (0 = top)
+  - created_at (timestamp)
+  - updated_at (timestamp)
+- Indexes: project_id, z_index, track_order
+- Relationships: project (many-to-one), track_items (one-to-many)
+- Create migration: `alembic revision --autogenerate -m "Add Track model for timeline tracks"`
+
+### TrackItem Model & Database
+- Create TrackItem model representing individual elements placed on tracks
+- Fields:
+  - id (UUID, primary key)
+  - track_id (UUID, foreign key to tracks, cascade delete)
+  - item_type (enum: 'video_clip', 'audio_clip', 'image', 'text', 'shape')
+  - source_type (enum: 'video', 'asset', 'text', 'generated')
+  - source_id (UUID, nullable) - reference to Video, Asset, or other source
+  - source_url (string, S3 URL, nullable) - direct URL if not from database
+  - start_time (float, seconds) - when item starts on timeline
+  - end_time (float, seconds) - when item ends on timeline
+  - duration (float, seconds) - item duration (end_time - start_time)
+  - trim_start (float, seconds, default 0) - trim from start of source
+  - trim_end (float, seconds, default 0) - trim from end of source
+  - position_x (float, 0.0-1.0, default 0.0) - horizontal position (0 = left, 0.5 = center, 1 = right)
+  - position_y (float, 0.0-1.0, default 0.0) - vertical position (0 = top, 0.5 = center, 1 = bottom)
+  - scale_x (float, default 1.0) - horizontal scale
+  - scale_y (float, default 1.0) - vertical scale
+  - rotation (float, degrees, default 0.0) - rotation angle
+  - crop_settings (JSON, nullable) - crop coordinates {top, bottom, left, right}
+  - transform_settings (JSON, nullable) - advanced transform (skew, flip, etc.)
+  - text_content (text, nullable) - for text items
+  - text_style (JSON, nullable) - font, size, color, alignment, etc.
+  - effects (JSON array, nullable) - applied effects list
+  - transition_in (UUID, foreign key to transitions, nullable)
+  - transition_out (UUID, foreign key to transitions, nullable)
+  - created_at (timestamp)
+  - updated_at (timestamp)
+- Indexes: track_id, start_time, item_type
+- Validation: end_time > start_time, duration = end_time - start_time
+- Create migration: `alembic revision --autogenerate -m "Add TrackItem model for timeline items"`
+
+### Asset Model & Database
+- Create Asset model for reusable media assets (images, audio, fonts)
+- Fields:
+  - id (UUID, primary key)
+  - user_id (UUID, foreign key to users)
+  - asset_type (enum: 'image', 'audio', 'font', 'graphic', 'template')
+  - name (string, 255 chars, required)
+  - file_url (string, S3 URL, required) - asset file location
+  - file_size (bigint, bytes)
+  - mime_type (string) - e.g., "image/png", "audio/mp3", "font/ttf"
+  - width (integer, nullable) - for images
+  - height (integer, nullable) - for images
+  - duration_seconds (float, nullable) - for audio
+  - metadata (JSON) - additional metadata (color profile, sample rate, etc.)
+  - thumbnail_url (string, S3 URL, nullable) - preview thumbnail
+  - is_public (boolean, default false) - available to all users
+  - tags (string array) - searchable tags
+  - usage_count (integer, default 0) - how many times used
+  - created_at (timestamp)
+  - updated_at (timestamp)
+- Indexes: user_id, asset_type, created_at DESC, tags (GIN index for arrays)
+- Create migration: `alembic revision --autogenerate -m "Add Asset model for media library"`
+
+### Transition Model & Database
+- Create Transition model for transition effects library
+- Fields:
+  - id (UUID, primary key)
+  - name (string, 255 chars, required) - e.g., "Fade", "Dissolve", "Slide Left"
+  - transition_type (enum: 'fade', 'dissolve', 'slide', 'wipe', 'zoom', 'blur', 'custom')
+  - direction (enum: 'in', 'out', nullable) - for directional transitions
+  - default_duration (float, seconds, default 0.5) - default transition length
+  - parameters (JSON) - transition-specific parameters (easing, direction, etc.)
+  - preview_url (string, S3 URL, nullable) - preview animation/video
+  - is_builtin (boolean, default true) - built-in vs user-created
+  - is_public (boolean, default true) - available to all users
+  - created_at (timestamp)
+  - updated_at (timestamp)
+- Indexes: transition_type, is_public
+- Seed database with built-in transitions:
+  - Fade (in/out): Linear opacity change
+  - Dissolve: Cross-fade between clips
+  - Slide (left/right/up/down): Sliding motion
+  - Wipe (horizontal/vertical/diagonal): Progressive reveal
+  - Zoom (in/out): Scale transition
+  - Blur: Blur transition effect
+- Create migration: `alembic revision --autogenerate -m "Add Transition model and seed built-in transitions"`
+
+### CompositionEffect Model & Database
+- Create CompositionEffect model for reusable effects (filters, color grading, etc.)
+- Fields:
+  - id (UUID, primary key)
+  - name (string, 255 chars, required)
+  - effect_type (enum: 'filter', 'color', 'blur', 'sharpen', 'distort', 'custom')
+  - parameters (JSON) - effect-specific parameters
+  - ffmpeg_filter (string, nullable) - FFmpeg filter string
+  - is_builtin (boolean, default true)
+  - preview_url (string, S3 URL, nullable)
+  - created_at (timestamp)
+- Seed with common effects: grayscale, sepia, brightness, contrast, saturation, blur, sharpen
+- Create migration: `alembic revision --autogenerate -m "Add CompositionEffect model"`
+
+### Composition Service
+- Create `backend/app/services/composition_service.py`
+- Class: CompositionService
+- Methods:
+  - `async def create_project(user_id: UUID, config: ProjectConfig) -> Project`
+    - Create new multi-track project
+    - Initialize default settings (resolution, frame rate)
+    - Create default tracks (1 video track, 1 audio track)
+    - Return Project object
+  - `async def get_project(project_id: UUID, user_id: UUID) -> Project`
+    - Fetch project with all tracks and items
+    - Verify user ownership
+    - Return full project structure
+  - `async def update_project(project_id: UUID, updates: dict, user_id: UUID) -> Project`
+    - Update project settings (name, resolution, duration, etc.)
+    - Validate changes (resolution valid, duration positive)
+    - Return updated Project
+  - `async def delete_project(project_id: UUID, user_id: UUID) -> None`
+    - Soft delete project (mark as deleted)
+    - Clean up associated S3 files (rendered outputs)
+    - Delete tracks and items (cascade)
+  - `async def add_track(project_id: UUID, track_config: TrackConfig, user_id: UUID) -> Track`
+    - Add new track to project
+    - Set z_index automatically (top of stack)
+    - Return Track object
+  - `async def update_track(track_id: UUID, updates: dict, user_id: UUID) -> Track`
+    - Update track settings (name, volume, opacity, z_index, etc.)
+    - Reorder tracks if z_index changed
+    - Return updated Track
+  - `async def delete_track(track_id: UUID, user_id: UUID) -> None`
+    - Delete track and all items
+    - Adjust z_index of remaining tracks
+  - `async def add_track_item(track_id: UUID, item_config: TrackItemConfig, user_id: UUID) -> TrackItem`
+    - Add item (video, image, text, etc.) to track
+    - Validate item fits within project duration
+    - Handle source reference (video_id, asset_id, or URL)
+    - Return TrackItem object
+  - `async def update_track_item(item_id: UUID, updates: dict, user_id: UUID) -> TrackItem`
+    - Update item properties (position, scale, rotation, start/end times, etc.)
+    - Validate changes (times within bounds, valid transforms)
+    - Return updated TrackItem
+  - `async def delete_track_item(item_id: UUID, user_id: UUID) -> None`
+    - Delete item from track
+  - `async def get_project_preview_data(project_id: UUID, time: float, user_id: UUID) -> dict`
+    - Get all visible items at specific time
+    - Return layered data for preview rendering
+    - Include all transforms, effects, opacity
+  - `async def validate_project(project_id: UUID, user_id: UUID) -> dict`
+    - Check project is ready for rendering
+    - Validate all source files exist
+    - Check for overlapping items, missing transitions
+    - Return validation report {valid: bool, errors: list, warnings: list}
+
+### Audio Mixing Service
+- Create `backend/app/services/audio_mixing_service.py`
+- Class: AudioMixingService
+- Methods:
+  - `async def mix_audio_tracks(project_id: UUID, output_path: str) -> str`
+    - Extract audio from all audio and video tracks
+    - Apply volume levels, fade in/out
+    - Mix multiple audio tracks into single stereo output
+    - Handle timing (start_time, end_time for each track)
+    - Use FFmpeg amix filter or PyAV
+    - Return path to mixed audio file
+  - `async def apply_audio_fade(audio_path: str, fade_in: float, fade_out: float, output_path: str) -> str`
+    - Apply fade in/out effects to audio
+    - Use FFmpeg afade filter
+    - Return path to processed audio
+  - `async def normalize_audio(audio_path: str, target_level: float, output_path: str) -> str`
+    - Normalize audio to target level (e.g., -16 LUFS)
+    - Use FFmpeg loudnorm filter
+    - Return path to normalized audio
+  - `async def extract_audio_from_video(video_path: str, output_path: str, start: float = 0, duration: float = None) -> str`
+    - Extract audio track from video file
+    - Apply trim if start/duration specified
+    - Return path to extracted audio
+  - `def calculate_audio_levels(audio_path: str) -> dict`
+    - Analyze audio levels (peak, RMS, LUFS)
+    - Return audio analysis data
+  - `async def create_audio_waveform(audio_path: str, width: int, height: int) -> str`
+    - Generate waveform visualization image
+    - Return path to waveform PNG
+    - Cache waveforms for performance
+
+### Video Rendering Service
+- Create `backend/app/services/video_rendering_service.py`
+- Class: VideoRenderingService
+- Methods:
+  - `async def render_project(project_id: UUID, user_id: UUID, output_config: RenderConfig) -> str`
+    - Orchestrate full project rendering workflow
+    - Validate project first
+    - Build FFmpeg filter complex for composition
+    - Render video with all tracks, effects, transitions
+    - Mix audio tracks
+    - Export to specified format/quality
+    - Upload to S3
+    - Update Project status and render_output_url
+    - Return S3 URL of rendered video
+  - `async def build_ffmpeg_filter_complex(project: Project) -> str`
+    - Build complex FFmpeg filter graph from project structure
+    - Handle multiple inputs (video files, images, audio)
+    - Apply transforms (scale, position, rotation) to each layer
+    - Stack video layers by z_index using overlay filters
+    - Apply transitions using custom filters or xfade
+    - Apply effects (color, blur, etc.)
+    - Compose final output
+    - Return filter_complex string
+  - `async def render_video_layer(track_item: TrackItem, temp_dir: str) -> str`
+    - Render individual track item to video segment
+    - Apply item transforms and effects
+    - Handle different item types (video, image, text)
+    - Return path to rendered segment
+  - `async def apply_transition(clip1_path: str, clip2_path: str, transition: Transition, output_path: str) -> str`
+    - Apply transition effect between two clips
+    - Use FFmpeg xfade filter or custom filters
+    - Handle different transition types (fade, slide, wipe, etc.)
+    - Return path to transitioned output
+  - `async def render_text_overlay(text_item: TrackItem, duration: float, output_path: str) -> str`
+    - Render text to transparent video overlay
+    - Apply text styling (font, size, color, alignment, etc.)
+    - Use FFmpeg drawtext filter or Pillow + image sequence
+    - Return path to text overlay video
+  - `async def generate_preview_frame(project_id: UUID, time: float, user_id: UUID) -> str`
+    - Generate single frame preview at specified time
+    - Composite all visible layers at that time
+    - Return path to preview image (JPEG/PNG)
+    - Cache preview frames for timeline scrubbing
+  - `def estimate_render_time(project: Project) -> float`
+    - Estimate rendering time based on project complexity
+    - Factors: duration, number of tracks, effects, transitions, resolution
+    - Return estimated seconds
+  - `async def cancel_render(job_id: str) -> None`
+    - Cancel ongoing render job
+    - Clean up temporary files
+    - Update project status
+
+### Background Job Processing
+- ARQ task: `render_project(project_id: str, user_id: str, render_config: dict)`
+  - Enqueued when user requests project render
+  - Download all source files from S3 to temp directory
+  - Build FFmpeg filter complex
+  - Render video with progress tracking
+  - Mix audio tracks
+  - Encode final video (H.264, AAC audio)
+  - Upload to S3
+  - Update Project model (status, render_output_url, last_rendered_at)
+  - Send notification to user (SSE or webhook)
+  - Clean up temp files
+  - Track progress in Redis (0-100%)
+  - Handle errors with retry (max 2 retries)
+  - Job timeout: 30 minutes for complex projects
+- ARQ task: `generate_project_thumbnail(project_id: str)`
+  - Generate preview thumbnail for project
+  - Render frame at project midpoint or specified time
+  - Upload to S3
+  - Update Project.thumbnail_url
+- Progress tracking:
+  - Store progress in Redis: `progress:render:{project_id}`
+  - Stages: "Validating", "Downloading sources", "Rendering video", "Mixing audio", "Encoding", "Uploading", "Complete"
+  - Update percentage for each stage
+
+### Project API Endpoints
+- POST `/api/projects`: Create new project
+  - Body: {name, description?, video_id?, width, height, frame_rate, duration}
+  - Returns: Project object with default tracks
+  - Creates project with 1 video track and 1 audio track by default
+- GET `/api/projects`: List user's projects
+  - Query params: status, limit, offset, sort
+  - Returns: {projects: Project[], total: number}
+- GET `/api/projects/{id}`: Get project details
+  - Returns: Project with all tracks and items (nested)
+  - Include track ordering and z_index
+- PATCH `/api/projects/{id}`: Update project
+  - Body: Partial project updates {name?, description?, width?, height?, frame_rate?, duration?, background_color?, export_settings?}
+  - Returns: Updated Project
+- DELETE `/api/projects/{id}`: Delete project
+  - Soft delete project
+  - Returns: {message: "Project deleted"}
+- POST `/api/projects/{id}/duplicate`: Duplicate project
+  - Creates copy of project with all tracks and items
+  - Returns: New Project object
+- POST `/api/projects/{id}/render`: Trigger project rendering
+  - Body: {quality: 'low' | 'medium' | 'high' | 'max', format: 'mp4' | 'mov', resolution?: {width, height}}
+  - Enqueues render job
+  - Returns: {job_id: string, estimated_time: number}
+- GET `/api/projects/{id}/render/progress`: Get render progress
+  - Returns: {progress: number, stage: string, status: string, estimated_remaining: number}
+- POST `/api/projects/{id}/render/cancel`: Cancel ongoing render
+  - Cancels render job if in progress
+  - Returns: {message: "Render cancelled"}
+- GET `/api/projects/{id}/preview`: Get preview frame
+  - Query params: time (seconds)
+  - Returns: Image file (JPEG) of composed frame at time
+  - Cache preview frames for performance
+- GET `/api/projects/{id}/validate`: Validate project before render
+  - Returns: {valid: boolean, errors: string[], warnings: string[]}
+
+### Track API Endpoints
+- POST `/api/projects/{project_id}/tracks`: Add track to project
+  - Body: {track_type, name, z_index?, volume?, opacity?}
+  - Returns: Track object
+- GET `/api/tracks/{id}`: Get track details
+  - Returns: Track with all items
+- PATCH `/api/tracks/{id}`: Update track
+  - Body: Partial track updates {name?, z_index?, volume?, opacity?, is_locked?, is_visible?, is_muted?}
+  - Returns: Updated Track
+- DELETE `/api/tracks/{id}`: Delete track
+  - Deletes track and all items
+  - Returns: {message: "Track deleted"}
+- POST `/api/tracks/{id}/duplicate`: Duplicate track
+  - Creates copy of track with all items
+  - Returns: New Track object
+- POST `/api/tracks/{id}/reorder`: Reorder track in list
+  - Body: {new_order: number}
+  - Updates track_order for this and other tracks
+  - Returns: {message: "Track reordered"}
+
+### TrackItem API Endpoints
+- POST `/api/tracks/{track_id}/items`: Add item to track
+  - Body: {item_type, source_type, source_id?, source_url?, start_time, end_time, position_x?, position_y?, scale_x?, scale_y?, rotation?, text_content?, text_style?, transition_in?, transition_out?}
+  - Returns: TrackItem object
+- GET `/api/items/{id}`: Get item details
+  - Returns: TrackItem object
+- PATCH `/api/items/{id}`: Update item
+  - Body: Partial item updates (any TrackItem field)
+  - Returns: Updated TrackItem
+- DELETE `/api/items/{id}`: Delete item
+  - Returns: {message: "Item deleted"}
+- POST `/api/items/{id}/duplicate`: Duplicate item
+  - Creates copy of item on same track
+  - Returns: New TrackItem object
+- POST `/api/items/{id}/split`: Split item at time
+  - Body: {split_time: number}
+  - Splits item into two items at specified time
+  - Returns: {item1: TrackItem, item2: TrackItem}
+
+### Asset API Endpoints
+- POST `/api/assets/upload`: Upload asset to library
+  - Multipart form data: file, asset_type, name, tags[]
+  - Upload to S3
+  - Create Asset record
+  - Generate thumbnail if image
+  - Returns: Asset object
+- GET `/api/assets`: List user's assets
+  - Query params: asset_type, tags, limit, offset, search
+  - Returns: {assets: Asset[], total: number}
+- GET `/api/assets/{id}`: Get asset details
+  - Returns: Asset object with presigned URL
+- PATCH `/api/assets/{id}`: Update asset metadata
+  - Body: {name?, tags?}
+  - Returns: Updated Asset
+- DELETE `/api/assets/{id}`: Delete asset
+  - Delete from S3 and database
+  - Check if asset is used in any projects (warn or prevent deletion)
+  - Returns: {message: "Asset deleted"}
+- GET `/api/assets/search`: Search assets
+  - Query params: q (query string), asset_type, tags
+  - Returns: {assets: Asset[], total: number}
+
+### Transition API Endpoints
+- GET `/api/transitions`: List available transitions
+  - Query params: transition_type, is_public
+  - Returns: {transitions: Transition[]}
+- GET `/api/transitions/{id}`: Get transition details
+  - Returns: Transition object with preview URL
+- POST `/api/transitions`: Create custom transition (future feature)
+  - Body: {name, transition_type, parameters, ffmpeg_filter?}
+  - Returns: Transition object
+
+### MultiTrackTimeline Component
+- Client component for main multi-track timeline interface
+- File: `frontend/src/components/editor/MultiTrackTimeline.tsx`
+- Props: projectId (string), onItemSelect (function), onTimeChange (function)
+- Features:
+  - Display all tracks vertically stacked (video tracks at top, audio at bottom)
+  - Each track shows: name, controls (lock, visibility, mute, volume), track items
+  - Track items displayed as draggable rectangles on timeline
+  - Timeline ruler showing time markers (00:00, 00:01, etc.)
+  - Playhead (red line) indicating current time
+  - Zoom controls (zoom in/out timeline)
+  - Snap to grid toggle (snap items to frame boundaries)
+  - Track height adjustable (expand/collapse)
+  - Drag and drop items from AssetLibrary onto tracks
+  - Drag items to reorder on timeline or move between tracks
+  - Resize items to adjust duration (trim)
+  - Split items with context menu or keyboard shortcut
+  - Add transitions by dragging between items
+  - Multi-select items (Shift+click or drag select box)
+  - Copy/paste items
+  - Undo/redo support (local state management)
+  - Keyboard shortcuts:
+    - Space: Play/pause
+    - Arrow keys: Move playhead
+    - Delete: Delete selected items
+    - Cmd/Ctrl+C/V: Copy/paste
+    - Cmd/Ctrl+Z/Shift+Z: Undo/redo
+    - S: Split at playhead
+  - Context menu on items: Edit, Duplicate, Split, Delete, Add Transition
+  - Visual indicators:
+    - Item thumbnails (video/image preview)
+    - Audio waveforms on audio tracks
+    - Transition overlays between items
+    - Selected item highlight
+  - Performance optimizations:
+    - Virtualized rendering for many items
+    - Canvas-based rendering with React-Konva or custom
+    - Debounced updates on drag
+- Use React-Konva for high-performance canvas rendering
+- State management: React Context or Zustand for timeline state
+- Real-time updates: Sync with backend via API calls on changes
+- Shadcn components: Button, Slider, ContextMenu, Tooltip
+- Create file: `frontend/src/components/editor/MultiTrackTimeline.tsx`
+
+### TrackHeader Component
+- Client component for individual track header (left side of timeline)
+- File: `frontend/src/components/editor/TrackHeader.tsx`
+- Props: track (Track), onUpdate (function), onDelete (function)
+- Features:
+  - Track name (editable on double-click)
+  - Track type icon (video, audio, image, text)
+  - Lock button (toggle is_locked)
+  - Visibility button (toggle is_visible)
+  - Mute button (toggle is_muted, audio tracks only)
+  - Volume slider (adjust volume, audio tracks only)
+  - Opacity slider (adjust opacity, video/image tracks)
+  - Track color indicator (customizable)
+  - Context menu: Duplicate Track, Delete Track, Reorder
+  - Drag handle for reordering tracks
+- Shadcn components: Button, Slider, Input, ContextMenu
+- Create file: `frontend/src/components/editor/TrackHeader.tsx`
+
+### TimelineItem Component
+- Client component for individual timeline item (video clip, image, audio, text)
+- File: `frontend/src/components/editor/TimelineItem.tsx`
+- Props: item (TrackItem), scale (number), onUpdate (function), onDelete (function), onSelect (function)
+- Features:
+  - Rectangle representing item on timeline
+  - Position based on start_time, width based on duration
+  - Item thumbnail or waveform preview
+  - Item name overlay
+  - Trim handles (left and right edges) for adjusting start/end
+  - Drag to move item on timeline
+  - Resize handles for duration adjustment
+  - Transition indicators on edges if transitions applied
+  - Selected state (highlighted border)
+  - Error state if source missing (red border, warning icon)
+  - Context menu: Edit, Duplicate, Split, Add Transition, Delete
+  - Tooltip showing item details on hover (start, end, duration, source)
+- Use React-Konva for canvas rendering or styled div
+- Smooth drag and resize with constraints (snap to grid, boundaries)
+- Visual feedback during drag (ghost/preview)
+- Create file: `frontend/src/components/editor/TimelineItem.tsx`
+
+### AssetLibrary Component
+- Client component for browsing and managing assets
+- File: `frontend/src/components/editor/AssetLibrary.tsx`
+- Props: projectId (string), onAssetSelect (function)
+- Features:
+  - Tabs for asset types: Images, Audio, Fonts, Templates, My Uploads
+  - Grid view of assets with thumbnails
+  - Search bar (filter by name, tags)
+  - Filter by asset type
+  - Upload button (opens upload dialog)
+  - Asset cards showing:
+    - Thumbnail/preview
+    - Asset name
+    - File size, dimensions (images), duration (audio)
+    - Tags
+    - Usage count
+  - Drag assets from library to timeline (creates TrackItem)
+  - Click asset to preview
+  - Context menu: Use in Project, Edit Details, Delete
+  - Pagination or infinite scroll for large libraries
+  - Empty state: "No assets found. Upload assets to get started."
+  - Loading state: Skeleton loaders
+- Fetch assets from GET /api/assets
+- Shadcn components: Tabs, Card, Button, Input, Dialog, ContextMenu, Badge
+- Create file: `frontend/src/components/editor/AssetLibrary.tsx`
+
+### AssetUploadDialog Component
+- Client component for uploading assets to library
+- File: `frontend/src/components/editor/AssetUploadDialog.tsx`
+- Props: isOpen (boolean), onClose (function), onUploadComplete (function)
+- Features:
+  - File input or drag-and-drop zone
+  - Asset type selector (auto-detect from file type)
+  - Name input (default to filename)
+  - Tags input (comma-separated or chips)
+  - Preview uploaded file before saving
+  - Upload progress bar
+  - Multiple file upload support
+  - Validation: file type, file size (max 100MB per file)
+  - Error handling: Display upload errors
+- Upload files to POST /api/assets/upload
+- Shadcn components: Dialog, Input, Button, Progress, Label
+- Create file: `frontend/src/components/editor/AssetUploadDialog.tsx`
+
+### TransitionSelector Component
+- Client component for selecting and applying transitions
+- File: `frontend/src/components/editor/TransitionSelector.tsx`
+- Props: itemId (string), position ('in' | 'out'), currentTransition (Transition?), onSelect (function)
+- Features:
+  - Grid of available transitions with preview thumbnails
+  - Filter by transition type (fade, dissolve, slide, wipe, zoom)
+  - Preview transition on hover or click (animated demo)
+  - Duration slider (adjust transition length, 0.1s to 3s)
+  - Apply button
+  - Remove transition button (if transition already applied)
+  - Popular transitions highlighted
+  - Search transitions by name
+- Fetch transitions from GET /api/transitions
+- Apply transition by updating TrackItem (transition_in or transition_out)
+- Shadcn components: Dialog, Button, Slider, Input, Card
+- Create file: `frontend/src/components/editor/TransitionSelector.tsx`
+
+### AudioMixer Component
+- Client component for mixing and adjusting audio tracks
+- File: `frontend/src/components/editor/AudioMixer.tsx`
+- Props: projectId (string)
+- Features:
+  - List of all audio tracks in project (audio tracks + video tracks with audio)
+  - Each track row shows:
+    - Track name and icon
+    - Waveform visualization (mini)
+    - Volume slider (0-200%, 100% = original)
+    - Mute/solo buttons
+    - Pan slider (left/center/right)
+    - VU meter showing current audio level
+  - Master output controls:
+    - Master volume slider
+    - Master waveform (mixed output)
+    - Normalization toggle
+  - Fade in/out controls for each track:
+    - Fade in duration (seconds)
+    - Fade out duration (seconds)
+    - Easing function selector (linear, ease-in-out, etc.)
+  - Audio effects (future):
+    - EQ, compression, reverb (placeholder UI)
+  - Preview audio mix button (plays mixed audio without video)
+  - Reset to default button
+  - Changes auto-save to backend (debounced updates)
+- Fetch project tracks from GET /api/projects/{id}
+- Update tracks with PATCH /api/tracks/{id}
+- Shadcn components: Card, Slider, Button, Toggle, Separator
+- Create file: `frontend/src/components/editor/AudioMixer.tsx`
+
+### PropertyPanel Component
+- Client component for editing selected item properties
+- File: `frontend/src/components/editor/PropertyPanel.tsx`
+- Props: selectedItem (TrackItem?), onUpdate (function)
+- Features:
+  - Display properties of selected timeline item
+  - Tabs: Transform, Effects, Transitions, Advanced
+  - Transform tab:
+    - Position X/Y (sliders or number inputs)
+    - Scale X/Y (percentage inputs)
+    - Rotation (degree input with dial)
+    - Crop settings (top/bottom/left/right pixel inputs)
+    - Flip horizontal/vertical toggles
+    - Reset button
+  - Effects tab:
+    - List of available effects (blur, sharpen, color adjust, etc.)
+    - Add effect button
+    - Applied effects list (reorderable)
+    - Effect parameters (effect-specific inputs)
+    - Remove effect button
+  - Transitions tab:
+    - Transition in selector (opens TransitionSelector)
+    - Transition out selector
+    - Preview transitions
+  - Advanced tab:
+    - Blend mode selector
+    - Opacity slider
+    - Trim settings (trim_start, trim_end)
+  - Text-specific properties (if item is text):
+    - Text content input
+    - Font selector
+    - Font size slider
+    - Color picker
+    - Alignment buttons
+    - Shadow/outline toggles
+  - Real-time preview updates in video player
+  - Apply/Cancel buttons or auto-save
+- Update item with PATCH /api/items/{id}
+- Shadcn components: Tabs, Input, Slider, Button, Select, Popover, ColorPicker
+- Create file: `frontend/src/components/editor/PropertyPanel.tsx`
+
+### CompositionPreview Component
+- Client component for real-time preview of composition
+- File: `frontend/src/components/editor/CompositionPreview.tsx`
+- Props: projectId (string), currentTime (number), isPlaying (boolean), onTimeUpdate (function)
+- Features:
+  - Video player showing composed output at current time
+  - Playback controls (play/pause, seek, skip forward/back)
+  - Time display (current time / total duration)
+  - Volume control
+  - Fullscreen button
+  - Quality selector (preview quality: low, medium, high)
+  - Resolution display
+  - FPS counter (debug mode)
+  - Loading state while rendering preview frame
+  - Real-time composition rendering:
+    - Option 1: Server-side rendering (fetch preview frame from GET /api/projects/{id}/preview?time={time})
+    - Option 2: Client-side rendering with Remotion (more complex but real-time)
+  - Sync with timeline playhead
+  - Scrubbing updates preview immediately
+- For real-time playback: Render preview at lower quality/resolution for performance
+- Cache preview frames for scrubbing performance
+- Use Video.js or custom video player
+- Shadcn components: Button, Slider
+- Create file: `frontend/src/components/editor/CompositionPreview.tsx`
+
+### AdvancedEditorPage Component
+- Page component for Advanced Editor interface
+- File: `frontend/src/app/editor/advanced/[projectId]/page.tsx`
+- Layout:
+  - Top toolbar: Project name, Save button, Render button, Share button, Settings
+  - Left panel (resizable): AssetLibrary (collapsible)
+  - Center top: CompositionPreview
+  - Center bottom: MultiTrackTimeline
+  - Right panel (resizable): PropertyPanel (collapsible)
+  - Bottom: AudioMixer (expandable drawer)
+- State management:
+  - Project data (tracks, items)
+  - Selected items
+  - Current playhead time
+  - Playback state
+  - Undo/redo history
+- Auto-save project changes (debounced, every 5 seconds)
+- Prompt before leaving page if unsaved changes
+- Keyboard shortcuts help dialog
+- Loading state while fetching project data
+- Error state if project not found or load fails
+- Create file: `frontend/src/app/editor/advanced/[projectId]/page.tsx`
+
+### ProjectCreationDialog Component
+- Client component for creating new projects
+- File: `frontend/src/components/editor/ProjectCreationDialog.tsx`
+- Props: isOpen (boolean), onClose (function), onProjectCreated (function)
+- Features:
+  - Project name input (required)
+  - Description textarea (optional)
+  - Resolution presets:
+    - 1080p (1920x1080)
+    - 720p (1280x720)
+    - 4K (3840x2160)
+    - Vertical (1080x1920) for social media
+    - Custom (width/height inputs)
+  - Frame rate selector: 24, 30, 60 fps
+  - Duration input (seconds or MM:SS)
+  - Starting template selector:
+    - Blank project
+    - From existing video (video selector)
+    - From template (preset templates)
+  - Create button
+  - Cancel button
+- Validation: name required, resolution valid, duration > 0
+- Create project with POST /api/projects
+- Redirect to editor page on success
+- Shadcn components: Dialog, Input, Select, Button, RadioGroup, Textarea
+- Create file: `frontend/src/components/editor/ProjectCreationDialog.tsx`
+
+### ProjectsList Component
+- Client component for listing user's projects
+- File: `frontend/src/components/editor/ProjectsList.tsx`
+- Props: userId (string)
+- Features:
+  - Grid or list view of projects
+  - Each project card shows:
+    - Thumbnail (preview frame)
+    - Project name
+    - Duration, resolution
+    - Status (draft, rendering, completed)
+    - Last updated date
+    - Action buttons: Open, Duplicate, Delete
+  - New Project button (opens ProjectCreationDialog)
+  - Search/filter projects by name, status
+  - Sort by: date, name, duration
+  - Empty state: "No projects yet. Create your first project!"
+  - Loading state: Skeleton loaders
+- Fetch projects from GET /api/projects
+- Shadcn components: Card, Button, Input, Select, ContextMenu
+- Create file: `frontend/src/components/editor/ProjectsList.tsx`
+
+### RenderDialog Component
+- Client component for rendering/exporting project
+- File: `frontend/src/components/editor/RenderDialog.tsx`
+- Props: projectId (string), isOpen (boolean), onClose (function)
+- Features:
+  - Quality preset selector:
+    - Low (720p, 2 Mbps)
+    - Medium (1080p, 5 Mbps)
+    - High (1080p, 10 Mbps)
+    - Max (4K, 20 Mbps)
+    - Custom (advanced settings)
+  - Format selector: MP4, MOV, WebM
+  - Resolution override (optional)
+  - Advanced settings (expandable):
+    - Codec: H.264, H.265, VP9
+    - Bitrate (Mbps)
+    - Audio codec: AAC, MP3
+    - Audio bitrate (kbps)
+  - Estimated file size display
+  - Estimated render time display
+  - Render button
+  - Cancel button
+  - Progress display (after render started):
+    - Progress bar (0-100%)
+    - Current stage message
+    - Time remaining
+    - Cancel render button
+  - Success state:
+    - Download button
+    - Preview rendered video
+    - Share options
+- Trigger render with POST /api/projects/{id}/render
+- Poll render progress with GET /api/projects/{id}/render/progress
+- Shadcn components: Dialog, Select, Button, Progress, Slider, Accordion
+- Create file: `frontend/src/components/editor/RenderDialog.tsx`
+
+### Frontend API Client Functions
+- `createProject(config: ProjectConfig): Promise<Project>`
+  - Create new project
+  - Config: {name, description?, video_id?, width, height, frame_rate, duration}
+- `getProjects(params?: {status?, limit?, offset?, sort?}): Promise<{projects: Project[], total: number}>`
+  - Fetch user's projects
+- `getProject(projectId: string): Promise<Project>`
+  - Fetch project with tracks and items
+- `updateProject(projectId: string, updates: Partial<Project>): Promise<Project>`
+  - Update project settings
+- `deleteProject(projectId: string): Promise<void>`
+  - Delete project
+- `duplicateProject(projectId: string): Promise<Project>`
+  - Duplicate project
+- `renderProject(projectId: string, config: RenderConfig): Promise<{job_id: string, estimated_time: number}>`
+  - Trigger project rendering
+  - Config: {quality, format, resolution?}
+- `getRenderProgress(projectId: string): Promise<RenderProgress>`
+  - Get render progress
+- `cancelRender(projectId: string): Promise<void>`
+  - Cancel ongoing render
+- `getProjectPreview(projectId: string, time: number): Promise<string>`
+  - Get preview frame URL at time
+- `validateProject(projectId: string): Promise<ValidationResult>`
+  - Validate project before render
+- `addTrack(projectId: string, config: TrackConfig): Promise<Track>`
+  - Add track to project
+- `updateTrack(trackId: string, updates: Partial<Track>): Promise<Track>`
+  - Update track
+- `deleteTrack(trackId: string): Promise<void>`
+  - Delete track
+- `duplicateTrack(trackId: string): Promise<Track>`
+  - Duplicate track
+- `reorderTrack(trackId: string, newOrder: number): Promise<void>`
+  - Reorder track
+- `addTrackItem(trackId: string, config: TrackItemConfig): Promise<TrackItem>`
+  - Add item to track
+- `updateTrackItem(itemId: string, updates: Partial<TrackItem>): Promise<TrackItem>`
+  - Update item
+- `deleteTrackItem(itemId: string): Promise<void>`
+  - Delete item
+- `duplicateTrackItem(itemId: string): Promise<TrackItem>`
+  - Duplicate item
+- `splitTrackItem(itemId: string, splitTime: number): Promise<{item1: TrackItem, item2: TrackItem}>`
+  - Split item at time
+- `uploadAsset(file: File, config: {asset_type: AssetType, name: string, tags: string[]}): Promise<Asset>`
+  - Upload asset to library
+- `getAssets(params?: {asset_type?, tags?, limit?, offset?, search?}): Promise<{assets: Asset[], total: number}>`
+  - Fetch user's assets
+- `updateAsset(assetId: string, updates: {name?, tags?}): Promise<Asset>`
+  - Update asset metadata
+- `deleteAsset(assetId: string): Promise<void>`
+  - Delete asset
+- `searchAssets(query: string, params?: {asset_type?, tags?}): Promise<{assets: Asset[], total: number}>`
+  - Search assets
+- `getTransitions(params?: {transition_type?, is_public?}): Promise<{transitions: Transition[]}>`
+  - Fetch available transitions
+- All functions use apiClient with proper error handling and TypeScript types
+- Create file: `frontend/src/lib/api/advancedEditor.ts`
+
+### TypeScript Type Definitions
+- Project interface: id, user_id, name, description, video_id, width, height, frame_rate, duration_seconds, background_color, canvas_settings, export_settings, thumbnail_url, status, last_rendered_at, render_output_url, created_at, updated_at, tracks
+- Track interface: id, project_id, track_type, name, z_index, is_locked, is_visible, is_muted, volume, opacity, blend_mode, track_order, created_at, updated_at, items
+- TrackItem interface: id, track_id, item_type, source_type, source_id, source_url, start_time, end_time, duration, trim_start, trim_end, position_x, position_y, scale_x, scale_y, rotation, crop_settings, transform_settings, text_content, text_style, effects, transition_in, transition_out, created_at, updated_at
+- Asset interface: id, user_id, asset_type, name, file_url, file_size, mime_type, width, height, duration_seconds, metadata, thumbnail_url, is_public, tags, usage_count, created_at, updated_at
+- Transition interface: id, name, transition_type, direction, default_duration, parameters, preview_url, is_builtin, is_public, created_at, updated_at
+- CompositionEffect interface: id, name, effect_type, parameters, ffmpeg_filter, is_builtin, preview_url, created_at
+- ProjectConfig interface: name, description?, video_id?, width, height, frame_rate, duration
+- TrackConfig interface: track_type, name, z_index?, volume?, opacity?
+- TrackItemConfig interface: item_type, source_type, source_id?, source_url?, start_time, end_time, position_x?, position_y?, scale_x?, scale_y?, rotation?, text_content?, text_style?, transition_in?, transition_out?
+- RenderConfig interface: quality ('low' | 'medium' | 'high' | 'max'), format ('mp4' | 'mov' | 'webm'), resolution?: {width: number, height: number}, codec?, bitrate?, audio_codec?, audio_bitrate?
+- RenderProgress interface: progress (0-100), stage (string), status ('queued' | 'processing' | 'completed' | 'error'), estimated_remaining (seconds)
+- ValidationResult interface: valid (boolean), errors (string[]), warnings (string[])
+- TrackType type: 'video' | 'audio' | 'image' | 'text' | 'overlay'
+- ItemType type: 'video_clip' | 'audio_clip' | 'image' | 'text' | 'shape'
+- SourceType type: 'video' | 'asset' | 'text' | 'generated'
+- AssetType type: 'image' | 'audio' | 'font' | 'graphic' | 'template'
+- TransitionType type: 'fade' | 'dissolve' | 'slide' | 'wipe' | 'zoom' | 'blur' | 'custom'
+- EffectType type: 'filter' | 'color' | 'blur' | 'sharpen' | 'distort' | 'custom'
+- BlendMode type: 'normal' | 'multiply' | 'screen' | 'overlay'
+- ProjectStatus type: 'draft' | 'rendering' | 'completed' | 'error'
+- TextStyle interface: font_family, font_size, color, alignment ('left' | 'center' | 'right'), bold, italic, underline, shadow, outline
+- CropSettings interface: top (pixels), bottom (pixels), left (pixels), right (pixels)
+- TransformSettings interface: skew_x?, skew_y?, flip_horizontal?, flip_vertical?
+- Create file: `frontend/src/types/advancedEditor.ts`
+
+### Testing Requirements
+- Backend unit tests:
+  - Test CompositionService methods (create, update, validate project)
+  - Test AudioMixingService (mix tracks, apply fade, normalize)
+  - Test VideoRenderingService (build filter complex, render layers, apply transitions)
+  - Test API endpoints (create project, add tracks, add items, render)
+- Backend integration tests:
+  - Test full project creation and rendering workflow
+  - Test multi-track composition with real video files
+  - Test audio mixing with multiple audio sources
+  - Test transitions and effects application
+  - Test preview frame generation
+- Worker tests:
+  - Test render_project task with various project configurations
+  - Test generate_project_thumbnail task
+  - Test progress tracking in Redis
+  - Test error handling and retries
+- Frontend component tests:
+  - Test MultiTrackTimeline (drag/drop, resize, add items)
+  - Test AssetLibrary (browse, upload, drag to timeline)
+  - Test PropertyPanel (edit item properties, apply effects)
+  - Test AudioMixer (adjust volume, mute, fade)
+  - Test RenderDialog (select quality, trigger render, monitor progress)
+- E2E tests:
+  - Create project and add tracks
+  - Upload asset and add to timeline
+  - Add video clip to timeline and adjust properties
+  - Add image overlay and position it
+  - Add text overlay and style it
+  - Add transition between clips
+  - Mix audio tracks with background music
+  - Preview composition
+  - Render project and download
+- Performance tests:
+  - Test rendering time for projects of varying complexity
+  - Test timeline performance with 50+ items
+  - Test preview frame generation speed
+  - Test concurrent renders (multiple users)
+- Accuracy tests:
+  - Verify rendered output matches preview
+  - Verify transitions work correctly
+  - Verify audio mix matches settings
+  - Verify text overlays render correctly
+
+### Performance Considerations
+- Timeline rendering:
+  - Use canvas-based rendering for performance (React-Konva)
+  - Virtualize timeline items (only render visible items)
+  - Debounce drag updates (update every 50ms, not every frame)
+  - Cache item thumbnails and waveforms
+- Preview generation:
+  - Generate preview frames on-demand
+  - Cache preview frames in S3 for scrubbing
+  - Use lower resolution for preview (e.g., 720p even if project is 4K)
+  - Background task to pre-generate preview frames at key intervals
+- Video rendering:
+  - Use GPU acceleration with FFmpeg (h264_nvenc, hevc_nvenc) if available
+  - Process in parallel where possible (render tracks separately, then compose)
+  - Use temp directory on fast storage (SSD)
+  - Clean up temp files immediately after render
+  - Limit concurrent renders per user (e.g., 1 at a time)
+  - Queue renders with priority (paid users first)
+- Asset management:
+  - Compress uploaded images (convert to WebP for thumbnails)
+  - Generate multiple sizes/resolutions for assets (thumbnails, previews, full)
+  - Use CDN for asset delivery (CloudFront)
+  - Lazy load assets in AssetLibrary
+- Memory management:
+  - Stream video files (don't load entire file in memory)
+  - Process video in chunks for analysis
+  - Clean up temp files aggressively
+  - Monitor worker memory usage and restart if leaks detected
+- Database optimization:
+  - Index project_id, user_id, created_at
+  - Use select_related/joinedload to avoid N+1 queries
+  - Cache project data in Redis for active editing sessions
+  - Denormalize track_count, item_count for faster queries
+
+### Quality Considerations
+- Validation:
+  - Validate all track items have valid source files before render
+  - Check for overlapping items on same track (warn user)
+  - Validate project duration >= max(item end times)
+  - Check for missing fonts (text overlays)
+  - Verify transition durations don't exceed clip durations
+- Error handling:
+  - Graceful degradation if preview generation fails (show placeholder)
+  - Clear error messages if render fails (missing source, invalid settings, etc.)
+  - Retry logic for transient failures (network issues)
+  - Automatic cleanup of failed renders
+- User feedback:
+  - Show loading states for all async operations
+  - Progress indicators for uploads, renders
+  - Success notifications for saves, renders
+  - Error notifications with actionable messages
+  - Undo/redo for all timeline operations
+- Quality settings:
+  - Presets for different use cases (web, YouTube, broadcast)
+  - Default to high quality (1080p, 10 Mbps)
+  - Warn if custom settings may cause issues
+  - Display estimated file size before render
+
+### Integration Points
+- Dashboard:
+  - "Advanced Editor" button in video actions dropdown
+  - "Create Multi-Track Project" button on dashboard
+  - Show project render status in dashboard
+- Video List:
+  - "Open in Advanced Editor" action for videos
+  - Create project from existing video (video as base layer)
+- Timeline Editor:
+  - "Switch to Advanced Editor" button for multi-track needs
+  - Import existing clips/edits into Advanced Editor project
+- Asset Library:
+  - Accessible from all editor contexts (main editor, advanced editor)
+  - Upload assets from any page, use in any project
+- Export:
+  - Rendered projects appear in user's video list
+  - Can be downloaded, shared, or further edited
+
+### Security Considerations
+- Authorization:
+  - Verify user owns project for all operations
+  - Verify user owns assets before adding to project
+  - Check user quota before starting render (storage, processing limits)
+  - Rate limit API calls (60 requests/minute per user)
+- File validation:
+  - Validate uploaded asset file types (images: PNG, JPEG, WebP; audio: MP3, WAV, AAC)
+  - Validate file sizes (max 100MB per asset)
+  - Scan uploaded files for malware (VirusTotal API or ClamAV)
+  - Sanitize file names (remove special characters)
+- Rendering security:
+  - Isolate render jobs (separate temp directories per job)
+  - Sanitize user input in text overlays (prevent injection)
+  - Validate FFmpeg filter strings (prevent command injection)
+  - Timeout renders after 30 minutes
+  - Clean up temp files even if render fails
+- Data privacy:
+  - Don't expose other users' projects or assets
+  - Use presigned S3 URLs with expiration
+  - Delete rendered outputs after 30 days (or user-specified retention)
+  - GDPR compliance (allow user to delete all projects/assets)
+
+### Accessibility Considerations
+- Keyboard navigation:
+  - Tab through timeline controls
+  - Arrow keys to move playhead
+  - Space to play/pause
+  - Keyboard shortcuts for common actions
+- Screen reader support:
+  - ARIA labels for all controls
+  - Announce timeline updates (item added, moved, deleted)
+  - Describe visual elements (track names, item types, etc.)
+- Visual accessibility:
+  - High contrast mode support
+  - Color-blind friendly color scheme
+  - Text overlays have readable contrast ratios
+  - Adjustable UI text size
+- Focus indicators:
+  - Clear focus states for all interactive elements
+  - Focus trap in modals
+  - Focus management when opening/closing panels
+
+## Success Criteria
+- Users can create multi-track projects with at least 5 video/audio/image tracks
+- Rendering completes in <5 minutes for 5-minute project with 10 tracks (1080p)
+- Timeline supports 100+ items without performance degradation
+- Preview frames generate in <2 seconds
+- Transitions work smoothly between all clip types
+- Audio mixing produces clean output with proper volume levels
+- Text overlays render with correct fonts and styling
+- Rendered output matches preview exactly
+- UI is intuitive (users can create project within 10 minutes without tutorial)
+- No data loss (auto-save works reliably)
+- Test coverage >85% for Advanced Editor code
+- Error rate <2% for renders
+- User satisfaction rating >4.5/5 for Advanced Editor feature
