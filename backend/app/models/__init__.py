@@ -9,6 +9,18 @@ from .batch import (
 )
 from .clip import Clip, ClipStatus
 from .highlight import Highlight, HighlightStatus, HighlightType
+from .subtitle import (
+    AnimationType,
+    FontWeight,
+    Platform,
+    PositionHorizontal,
+    PositionVertical,
+    SubtitleStyle,
+    SubtitleStylePreset,
+    SubtitleTranslation,
+    TranslationQuality,
+    TranslationStatus,
+)
 from .transcript import Transcript, TranscriptStatus
 from .user import User
 from .video import Video, VideoStatus
@@ -29,4 +41,14 @@ __all__ = [
     "Highlight",
     "HighlightStatus",
     "HighlightType",
+    "SubtitleStyle",
+    "SubtitleStylePreset",
+    "SubtitleTranslation",
+    "PositionVertical",
+    "PositionHorizontal",
+    "FontWeight",
+    "AnimationType",
+    "Platform",
+    "TranslationQuality",
+    "TranslationStatus",
 ]
