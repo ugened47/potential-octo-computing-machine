@@ -19,7 +19,7 @@ export function EditorToolbar({ video }: EditorToolbarProps) {
 
   const handleSilenceRemovalComplete = (outputVideoId: string) => {
     // Optionally refresh the page or update the video
-    console.log("Silence removal completed, output video ID:", outputVideoId);
+    // Output video ID is available if needed: outputVideoId
   };
 
   const handleClipCreated = () => {

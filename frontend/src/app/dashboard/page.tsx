@@ -30,6 +30,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload, Search, Grid3x3, List } from "lucide-react";
 import { getVideos, deleteVideo, getDashboardStats } from "@/lib/video-api";
+import { useOnboarding } from "@/store/onboarding-store";
+import { useDebounce } from "@/hooks/useDebounce";
 import type {
   Video,
   VideoListParams,

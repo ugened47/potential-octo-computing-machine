@@ -1,5 +1,6 @@
 // Video management API client
 import { tokenStorage } from "./token-storage";
+import type { DashboardStats } from "@/types/video";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -59,12 +60,6 @@ export interface VideoUpdateData {
   description?: string;
 }
 
-export interface VideoStats {
-  total_videos: number;
-  total_size: number;
-  by_status: Record<VideoStatus, number>;
-  recent_uploads: number; // Last 7 days
-}
 
 class VideoAPI {
   private async request<T>(
@@ -277,41 +272,43 @@ class VideoAPI {
   }
 
   /**
-   * Get thumbnail URL for a video
-   * @param id - Video ID
-   * @returns Thumbnail URL
+   * Get dashboard statistics for the current user
+   * @returns Dashboard statistics
    */
-  async getThumbnailUrl(id: string): Promise<{ url: string }> {
-    return this.request<{ url: string }>(`/api/videos/${id}/thumbnail`);
-  }
-
-  /**
-   * Get video statistics for the current user
-   * @returns Video statistics
-   */
-  async getStats(): Promise<VideoStats> {
-    return this.request<VideoStats>("/api/videos/stats");
-  }
-
-  /**
-   * Retry processing a failed video
-   * @param id - Video ID
-   * @returns Updated video object
-   */
-  async retryProcessing(id: string): Promise<Video> {
-    return this.request<Video>(`/api/videos/${id}/retry`, {
-      method: "POST",
-    });
-  }
-
-  /**
-   * Download a processed video
-   * @param id - Video ID
-   * @returns Download URL
-   */
-  async getDownloadUrl(id: string): Promise<{ url: string }> {
-    return this.request<{ url: string }>(`/api/videos/${id}/download`);
+  async getDashboardStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>("/api/dashboard/stats");
   }
 }
 
 export const videoAPI = new VideoAPI();
+
+// Named function exports for backward compatibility
+export const getPresignedUrl = (filename: string, contentType: string, size: number) =>
+  videoAPI.getPresignedUrl(filename, contentType, size);
+
+export const uploadToS3 = (presignedUrl: string, file: File, onProgress?: (progress: number) => void) =>
+  videoAPI.uploadToS3(presignedUrl, file, onProgress);
+
+export const createVideoRecord = (data: VideoCreateData) =>
+  videoAPI.createVideo(data);
+
+export const uploadVideo = (file: File, title: string, description?: string, onProgress?: (progress: number) => void) =>
+  videoAPI.uploadVideo(file, title, description, onProgress);
+
+export const getVideos = (params?: VideoListParams) =>
+  videoAPI.getVideos(params);
+
+export const getVideo = (id: string) =>
+  videoAPI.getVideo(id);
+
+export const updateVideo = (id: string, data: VideoUpdateData) =>
+  videoAPI.updateVideo(id, data);
+
+export const deleteVideo = (id: string) =>
+  videoAPI.deleteVideo(id);
+
+export const getPlaybackUrl = (id: string) =>
+  videoAPI.getPlaybackUrl(id);
+
+export const getDashboardStats = () =>
+  videoAPI.getDashboardStats();
