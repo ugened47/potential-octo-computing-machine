@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
+    from app.models.export import Export
     from app.models.transcript import Transcript
 
 
@@ -48,3 +49,4 @@ class Video(SQLModel, table=True):
 
     # Relationships
     transcript: Optional["Transcript"] = Relationship(back_populates="video")
+    exports: list["Export"] = Relationship(back_populates="video")

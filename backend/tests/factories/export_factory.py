@@ -4,35 +4,37 @@ import factory
 from datetime import datetime
 from faker import Faker
 
+from app.models import Export
+
 fake = Faker()
 
 
-# Note: Export model doesn't exist yet, so we define expected fields based on spec
 class ExportFactory(factory.alchemy.SQLAlchemyModelFactory):
     """Factory for creating Export instances in tests."""
 
     class Meta:
-        # model = Export  # Will be uncommented when model is created
+        model = Export
         sqlalchemy_session_persistence = "commit"
 
     id = factory.LazyFunction(lambda: fake.uuid4())
 
     # Export configuration
     resolution = factory.LazyFunction(
-        lambda: fake.random_element(["720p", "1080p", "1440p", "2160p"])
+        lambda: fake.random_element(["720p", "1080p", "4k"])
     )
     format = factory.LazyFunction(lambda: fake.random_element(["mp4", "mov", "webm"]))
-    quality = factory.LazyFunction(lambda: fake.random_element(["high", "medium", "low"]))
+    quality_preset = factory.LazyFunction(lambda: fake.random_element(["high", "medium", "low"]))
     export_type = factory.LazyFunction(
-        lambda: fake.random_element(["full", "clips", "merged_clips"])
+        lambda: fake.random_element(["single", "combined", "clips"])
     )
 
     # Segments to export (JSON field)
-    segments = factory.LazyFunction(
+    segment_selections = factory.LazyFunction(
         lambda: [
             {
-                "start": fake.random.uniform(0, 100),
-                "end": fake.random.uniform(101, 200),
+                "start_time": fake.random.uniform(0, 100),
+                "end_time": fake.random.uniform(101, 200),
+                "clip_id": None,
             }
             for _ in range(fake.random_int(min=1, max=5))
         ]
@@ -40,20 +42,25 @@ class ExportFactory(factory.alchemy.SQLAlchemyModelFactory):
 
     # Processing status
     status = factory.LazyFunction(
-        lambda: fake.random_element(["pending", "processing", "completed", "failed"])
+        lambda: fake.random_element(["pending", "processing", "completed", "failed", "cancelled"])
     )
-    progress = factory.LazyFunction(lambda: fake.random_int(min=0, max=100))
+    progress_percentage = factory.LazyFunction(lambda: fake.random_int(min=0, max=100))
     error_message = None
 
     # Output
+    output_s3_key = factory.LazyFunction(
+        lambda: f"exports/{fake.uuid4()}/{fake.uuid4()}.mp4"
+    )
     output_url = factory.LazyFunction(
         lambda: f"https://d123456.cloudfront.net/exports/{fake.uuid4()}.mp4"
     )
-    file_size = factory.LazyFunction(lambda: fake.random_int(min=5000000, max=500000000))
+    file_size_bytes = factory.LazyFunction(lambda: fake.random_int(min=5000000, max=500000000))
+    total_duration_seconds = factory.LazyFunction(lambda: fake.random_int(min=10, max=3600))
 
     # Timestamps
     created_at = factory.LazyFunction(datetime.utcnow)
     updated_at = factory.LazyFunction(datetime.utcnow)
+    started_at = None
     completed_at = None
 
     # Relationships
@@ -65,50 +72,57 @@ class ExportFactory(factory.alchemy.SQLAlchemyModelFactory):
 
         pending = factory.Trait(
             status="pending",
-            progress=0,
+            progress_percentage=0,
             output_url=None,
-            file_size=None,
+            output_s3_key=None,
+            file_size_bytes=None,
+            started_at=None,
             completed_at=None,
         )
 
         processing = factory.Trait(
             status="processing",
-            progress=factory.LazyFunction(lambda: fake.random_int(min=1, max=99)),
+            progress_percentage=factory.LazyFunction(lambda: fake.random_int(min=1, max=99)),
             output_url=None,
-            file_size=None,
+            output_s3_key=None,
+            file_size_bytes=None,
+            started_at=factory.LazyFunction(datetime.utcnow),
             completed_at=None,
         )
 
         completed = factory.Trait(
             status="completed",
-            progress=100,
+            progress_percentage=100,
+            started_at=factory.LazyFunction(datetime.utcnow),
             completed_at=factory.LazyFunction(datetime.utcnow),
         )
 
         failed = factory.Trait(
             status="failed",
-            progress=factory.LazyFunction(lambda: fake.random_int(min=0, max=99)),
+            progress_percentage=factory.LazyFunction(lambda: fake.random_int(min=0, max=99)),
             error_message=factory.LazyFunction(lambda: fake.sentence()),
             output_url=None,
-            file_size=None,
+            output_s3_key=None,
+            file_size_bytes=None,
+            started_at=factory.LazyFunction(datetime.utcnow),
             completed_at=None,
         )
 
         hd = factory.Trait(
             resolution="1080p",
-            quality="high",
+            quality_preset="high",
             format="mp4",
         )
 
         uhd = factory.Trait(
-            resolution="2160p",
-            quality="high",
+            resolution="4k",
+            quality_preset="high",
             format="mp4",
         )
 
         web_optimized = factory.Trait(
             resolution="720p",
-            quality="medium",
+            quality_preset="medium",
             format="webm",
         )
 
@@ -116,6 +130,6 @@ class ExportFactory(factory.alchemy.SQLAlchemyModelFactory):
             export_type="clips",
         )
 
-        merged_clips = factory.Trait(
-            export_type="merged_clips",
+        combined_clips = factory.Trait(
+            export_type="combined",
         )

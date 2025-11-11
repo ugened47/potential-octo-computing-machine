@@ -12,9 +12,11 @@ from sqlmodel import select
 from app.core.config import settings
 from app.core.db import async_session_maker
 from app.models.clip import Clip, ClipStatus
+from app.models.export import Export, ExportStatus
 from app.models.transcript import Transcript, TranscriptStatus
 from app.models.video import Video, VideoStatus
 from app.services.clip_generation import ClipGenerationService
+from app.services.export import ExportService
 from app.services.silence_removal import SilenceRemovalService
 from app.services.transcription import TranscriptionService
 from app.services.video_metadata import VideoMetadataService
@@ -369,6 +371,152 @@ async def generate_clip(ctx: dict[str, Any], clip_id: str) -> dict[str, Any]:
         raise
 
 
+async def export_video(ctx: dict[str, Any], export_id: str) -> dict[str, Any]:
+    """
+    Process video export job.
+
+    Args:
+        ctx: ARQ context
+        export_id: Export ID as string
+
+    Returns:
+        dict: Result with export ID and status
+    """
+    export_uuid = UUID(export_id)
+    redis_client = await redis.from_url(settings.redis_url)
+
+    async def update_progress(progress: int, stage: str = "") -> None:
+        """Update export progress in Redis."""
+        progress_key = f"export_progress:{export_id}"
+
+        progress_data = {
+            "progress": str(progress),
+            "stage": stage,
+            "elapsed_time": "0",  # Could track elapsed time
+            "estimated_time": "0",  # Could estimate time remaining
+        }
+
+        # Store in Redis hash
+        await redis_client.hset(progress_key, mapping=progress_data)
+        await redis_client.expire(progress_key, 3600)  # Expire after 1 hour
+
+    try:
+        # Create database session for worker
+        async with async_session_maker() as db:
+            # Get export record
+            result = await db.execute(select(Export).where(Export.id == export_uuid))
+            export = result.scalar_one_or_none()
+
+            if not export:
+                raise ValueError(f"Export {export_id} not found")
+
+            # Get video
+            result = await db.execute(select(Video).where(Video.id == export.video_id))
+            video = result.scalar_one_or_none()
+
+            if not video:
+                raise ValueError(f"Video {export.video_id} not found")
+
+            # Update export status to processing
+            export.status = ExportStatus.PROCESSING
+            export.started_at = ctx.get("job_start_time") or None
+            await db.commit()
+
+            # Update progress: Starting
+            await update_progress(0, "Initializing export")
+
+            # Process export
+            service = ExportService(db)
+
+            def progress_callback(progress: int) -> None:
+                """Sync progress callback for FFmpeg."""
+                import asyncio
+                try:
+                    loop = asyncio.get_running_loop()
+                    stage_map = {
+                        range(0, 20): "Downloading video",
+                        range(20, 90): "Processing video",
+                        range(90, 100): "Uploading to storage",
+                    }
+                    stage = "Processing"
+                    for r, s in stage_map.items():
+                        if progress in r:
+                            stage = s
+                            break
+                    loop.create_task(update_progress(progress, stage))
+                except RuntimeError:
+                    pass
+
+            # Check for cancellation
+            cancel_key = f"export_cancel:{export_id}"
+            if await redis_client.exists(cancel_key):
+                export.status = ExportStatus.CANCELLED
+                await db.commit()
+                await redis_client.delete(cancel_key)
+                return {
+                    "status": "cancelled",
+                    "export_id": export_id,
+                }
+
+            s3_key, cloudfront_url, file_size, total_duration = await service.process_export(
+                export_id=export_uuid,
+                video=video,
+                segments=export.segment_selections or [],
+                export_type=export.export_type,
+                resolution=export.resolution,
+                quality=export.quality_preset,
+                format_type=export.format,
+                progress_callback=progress_callback,
+            )
+
+            # Update export record with results
+            export.output_s3_key = s3_key
+            export.output_url = cloudfront_url
+            export.file_size_bytes = file_size
+            export.total_duration_seconds = total_duration
+            export.status = ExportStatus.COMPLETED
+            export.progress_percentage = 100
+            from datetime import datetime
+            export.completed_at = datetime.utcnow()
+
+            await db.commit()
+
+            # Clean up progress key after completion
+            progress_key = f"export_progress:{export_id}"
+            await redis_client.delete(progress_key)
+
+            return {
+                "status": "success",
+                "export_id": export_id,
+                "output_url": cloudfront_url,
+                "file_size": file_size,
+            }
+
+    except Exception as e:
+        # Update export status to failed
+        async with async_session_maker() as db:
+            result = await db.execute(select(Export).where(Export.id == export_uuid))
+            export = result.scalar_one_or_none()
+
+            if export:
+                export.status = ExportStatus.FAILED
+                export.error_message = str(e)
+                await db.commit()
+
+        # Update progress to show error
+        progress_key = f"export_progress:{export_id}"
+        error_data = {
+            "progress": "0",
+            "stage": f"Failed: {str(e)}",
+            "elapsed_time": "0",
+            "estimated_time": "0",
+        }
+        await redis_client.hset(progress_key, mapping=error_data)
+        await redis_client.expire(progress_key, 3600)
+
+        raise
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     """Worker startup hook."""
     print("Worker starting up...")
@@ -387,6 +535,7 @@ class WorkerSettings:
         extract_video_metadata,
         remove_silence,
         generate_clip,
+        export_video,
     ]
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
@@ -476,4 +625,19 @@ async def enqueue_generate_clip(clip_id: str) -> Any:
     """
     pool = await get_redis_pool()
     job = await pool.enqueue_job("generate_clip", clip_id)
+    return job
+
+
+async def enqueue_export_video(export_id: str) -> Any:
+    """
+    Enqueue a video export job.
+
+    Args:
+        export_id: Export ID as string
+
+    Returns:
+        Job result
+    """
+    pool = await get_redis_pool()
+    job = await pool.enqueue_job("export_video", export_id)
     return job

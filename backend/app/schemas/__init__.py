@@ -18,6 +18,14 @@ from .clip import (
     SearchRequest,
     SearchResult,
 )
+from .export import (
+    ExportCreateRequest,
+    ExportDownloadResponse,
+    ExportListResponse,
+    ExportProgressResponse,
+    ExportRead,
+    ExportSegmentInput,
+)
 from .silence import (
     SilenceDetectionResponse,
     SilenceRemovalProgress,
@@ -64,4 +72,10 @@ __all__ = [
     "WaveformStatus",
     "Segment",
     "SegmentCreate",
+    "ExportCreateRequest",
+    "ExportSegmentInput",
+    "ExportProgressResponse",
+    "ExportDownloadResponse",
+    "ExportRead",
+    "ExportListResponse",
 ]

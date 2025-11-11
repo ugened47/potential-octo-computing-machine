@@ -1,9 +1,13 @@
 """User model."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from app.models.export import Export
 
 
 class User(SQLModel, table=True):
@@ -32,3 +36,6 @@ class User(SQLModel, table=True):
     # Password reset
     password_reset_token: str | None = Field(default=None, max_length=255)
     password_reset_expires: datetime | None = Field(default=None)
+
+    # Relationships
+    exports: list["Export"] = Relationship(back_populates="user")
