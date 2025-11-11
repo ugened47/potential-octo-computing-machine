@@ -98,3 +98,184 @@ async def get_current_active_superuser(
     if not current_user.is_superuser:
         raise AuthorizationError("Not enough permissions")
     return current_user
+
+
+# Team Collaboration Dependencies
+
+
+async def get_permission_service(
+    db: AsyncSession = Depends(get_db),
+):
+    """Get permission service instance.
+
+    Args:
+        db: Database session
+
+    Returns:
+        PermissionService instance
+    """
+    from app.services.permission import PermissionService
+
+    return PermissionService(db)
+
+
+async def get_sharing_service(
+    db: AsyncSession = Depends(get_db),
+):
+    """Get sharing service instance.
+
+    Args:
+        db: Database session
+
+    Returns:
+        SharingService instance
+    """
+    from app.services.sharing import SharingService
+
+    return SharingService(db)
+
+
+async def get_notification_service(
+    db: AsyncSession = Depends(get_db),
+):
+    """Get notification service instance.
+
+    Args:
+        db: Database session
+
+    Returns:
+        NotificationService instance
+    """
+    from app.services.notification import NotificationService
+
+    return NotificationService(db)
+
+
+async def get_version_service(
+    db: AsyncSession = Depends(get_db),
+):
+    """Get version service instance.
+
+    Args:
+        db: Database session
+
+    Returns:
+        VersionService instance
+    """
+    from app.services.version import VersionService
+
+    return VersionService(db)
+
+
+async def get_comment_service(
+    db: AsyncSession = Depends(get_db),
+):
+    """Get comment service instance.
+
+    Args:
+        db: Database session
+
+    Returns:
+        CommentService instance
+    """
+    from app.services.comment import CommentService
+
+    return CommentService(db)
+
+
+async def require_video_view_permission(
+    video_id: UUID,
+    current_user: User = Depends(get_current_user),
+    permission_service = Depends(get_permission_service),
+) -> User:
+    """Require user to have view permission for video.
+
+    Args:
+        video_id: Video ID
+        current_user: Current authenticated user
+        permission_service: Permission service
+
+    Returns:
+        Current user if authorized
+
+    Raises:
+        AuthorizationError: If user doesn't have permission
+    """
+    result = await permission_service.can_view_video(current_user.id, video_id)
+    if not result.allowed:
+        raise AuthorizationError(f"Cannot view video: {result.reason}")
+    return current_user
+
+
+async def require_video_edit_permission(
+    video_id: UUID,
+    current_user: User = Depends(get_current_user),
+    permission_service = Depends(get_permission_service),
+) -> User:
+    """Require user to have edit permission for video.
+
+    Args:
+        video_id: Video ID
+        current_user: Current authenticated user
+        permission_service: Permission service
+
+    Returns:
+        Current user if authorized
+
+    Raises:
+        AuthorizationError: If user doesn't have permission
+    """
+    result = await permission_service.can_edit_video(current_user.id, video_id)
+    if not result.allowed:
+        raise AuthorizationError(f"Cannot edit video: {result.reason}")
+    return current_user
+
+
+async def require_video_delete_permission(
+    video_id: UUID,
+    current_user: User = Depends(get_current_user),
+    permission_service = Depends(get_permission_service),
+) -> User:
+    """Require user to have delete permission for video.
+
+    Args:
+        video_id: Video ID
+        current_user: Current authenticated user
+        permission_service: Permission service
+
+    Returns:
+        Current user if authorized
+
+    Raises:
+        AuthorizationError: If user doesn't have permission
+    """
+    result = await permission_service.can_delete_video(current_user.id, video_id)
+    if not result.allowed:
+        raise AuthorizationError(f"Cannot delete video: {result.reason}")
+    return current_user
+
+
+async def require_organization_admin(
+    organization_id: UUID,
+    current_user: User = Depends(get_current_user),
+    permission_service = Depends(get_permission_service),
+) -> User:
+    """Require user to be organization admin.
+
+    Args:
+        organization_id: Organization ID
+        current_user: Current authenticated user
+        permission_service: Permission service
+
+    Returns:
+        Current user if authorized
+
+    Raises:
+        AuthorizationError: If user is not admin
+    """
+    result = await permission_service.can_manage_organization(
+        current_user.id, organization_id
+    )
+    if not result.allowed:
+        raise AuthorizationError(f"Not an organization admin: {result.reason}")
+    return current_user
