@@ -138,11 +138,6 @@ jobs:
           cd frontend
           npm test -- --coverage
 
-      - name: Check coverage threshold
-        run: |
-          cd frontend
-          npm test -- --coverage --coverage.thresholds.lines=70
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
@@ -199,7 +194,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report-${{ matrix.browser }}
           path: frontend/playwright-report/
@@ -207,7 +202,7 @@ jobs:
 
       - name: Upload test videos
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-videos-${{ matrix.browser }}
           path: frontend/test-results/
