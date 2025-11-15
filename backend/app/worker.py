@@ -15,6 +15,8 @@ from app.models.clip import Clip, ClipStatus
 from app.models.transcript import Transcript, TranscriptStatus
 from app.models.video import Video, VideoStatus
 from app.services.clip_generation import ClipGenerationService
+from app.services.highlight_detection import HighlightDetectionService
+from app.services.s3 import S3Service
 from app.services.silence_removal import SilenceRemovalService
 from app.services.transcription import TranscriptionService
 from app.services.video_metadata import VideoMetadataService
@@ -369,6 +371,152 @@ async def generate_clip(ctx: dict[str, Any], clip_id: str) -> dict[str, Any]:
         raise
 
 
+async def detect_highlights(
+    ctx: dict[str, Any],
+    video_id: str,
+    sensitivity: str = "medium",
+    custom_keywords: list[str] | None = None,
+    score_weights: dict | None = None,
+) -> dict[str, Any]:
+    """
+    Detect highlights in a video using AI-powered analysis.
+
+    Args:
+        ctx: ARQ context
+        video_id: Video ID as string
+        sensitivity: Detection sensitivity ('low', 'medium', 'high', 'max')
+        custom_keywords: Optional custom keywords for detection
+        score_weights: Optional custom score weights
+
+    Returns:
+        dict: Result with video ID, highlight count, and status
+    """
+    import os
+    import tempfile
+    from pathlib import Path
+
+    video_uuid = UUID(video_id)
+    redis_client = await redis.from_url(settings.redis_url)
+
+    async def update_progress(progress: int, stage: str) -> None:
+        """Update highlight detection progress in Redis."""
+        progress_key = f"highlight_detection:progress:{video_id}"
+
+        # Calculate estimated time remaining (rough estimate)
+        if progress > 0:
+            # Assuming ~5 minutes for full detection
+            remaining_seconds = int((100 - progress) / 100 * 300)
+        else:
+            remaining_seconds = 300
+
+        progress_data = {
+            "progress": progress,
+            "status": stage,
+            "current_stage": stage,
+            "estimated_time_remaining": remaining_seconds,
+        }
+        await redis_client.setex(
+            progress_key, 3600, json.dumps(progress_data)
+        )  # Expire after 1 hour
+
+    temp_video_path = None
+
+    try:
+        # Create database session for worker
+        async with async_session_maker() as db:
+            # Get video from database
+            result = await db.execute(select(Video).where(Video.id == video_uuid))
+            video = result.scalar_one_or_none()
+
+            if not video:
+                raise ValueError(f"Video not found: {video_id}")
+
+            if not video.s3_key:
+                raise ValueError(f"Video S3 key not found for video: {video_id}")
+
+            # Update progress: Downloading
+            await update_progress(0, "Downloading video...")
+
+            # Download video from S3
+            s3_service = S3Service()
+            temp_dir = tempfile.mkdtemp()
+            temp_video_path = os.path.join(temp_dir, f"{video_id}.mp4")
+
+            await s3_service.download_file(video.s3_key, temp_video_path)
+
+            # Update progress: Analyzing audio
+            await update_progress(20, "Analyzing audio...")
+
+            # Create highlight detection service
+            detection_service = HighlightDetectionService()
+
+            # Clear any existing highlights for this video (optional)
+            await detection_service.clear_highlights(db, str(video_uuid))
+
+            # Update progress: Analyzing video
+            await update_progress(40, "Analyzing video...")
+
+            # Run detection (internally updates db at different stages)
+            # The service will handle audio, video, speech, and keyword analysis
+            highlights = await detection_service.detect_highlights(
+                db=db,
+                video_id=str(video_uuid),
+                video_path=temp_video_path,
+                sensitivity=sensitivity,
+                custom_keywords=custom_keywords,
+                score_weights=score_weights,
+            )
+
+            # Update progress: Analyzing speech
+            await update_progress(60, "Analyzing speech patterns...")
+
+            # Update progress: Scoring
+            await update_progress(80, "Scoring and ranking highlights...")
+
+            # Update video metadata with highlight count
+            video.highlight_count = len(highlights)  # type: ignore
+            await db.commit()
+
+            # Update progress: Complete
+            await update_progress(100, "Complete")
+
+            # Clean up progress key after completion
+            progress_key = f"highlight_detection:progress:{video_id}"
+            await redis_client.delete(progress_key)
+
+            return {
+                "status": "success",
+                "video_id": video_id,
+                "highlight_count": len(highlights),
+                "sensitivity": sensitivity,
+            }
+
+    except Exception as e:
+        # Update progress to show error
+        progress_key = f"highlight_detection:progress:{video_id}"
+        error_data = {
+            "progress": 0,
+            "status": f"Failed: {str(e)}",
+            "current_stage": "Error",
+            "estimated_time_remaining": None,
+        }
+        await redis_client.setex(progress_key, 3600, json.dumps(error_data))
+
+        raise
+
+    finally:
+        # Clean up temporary file
+        if temp_video_path and os.path.exists(temp_video_path):
+            try:
+                os.remove(temp_video_path)
+                # Also remove parent temp directory if empty
+                temp_dir = os.path.dirname(temp_video_path)
+                if os.path.exists(temp_dir) and not os.listdir(temp_dir):
+                    os.rmdir(temp_dir)
+            except Exception as e:
+                print(f"Error cleaning up temp file: {e}")
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     """Worker startup hook."""
     print("Worker starting up...")
@@ -387,6 +535,7 @@ class WorkerSettings:
         extract_video_metadata,
         remove_silence,
         generate_clip,
+        detect_highlights,
     ]
 
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
@@ -476,4 +625,33 @@ async def enqueue_generate_clip(clip_id: str) -> Any:
     """
     pool = await get_redis_pool()
     job = await pool.enqueue_job("generate_clip", clip_id)
+    return job
+
+
+async def enqueue_detect_highlights(
+    video_id: str,
+    sensitivity: str = "medium",
+    custom_keywords: list[str] | None = None,
+    score_weights: dict | None = None,
+) -> Any:
+    """
+    Enqueue a highlight detection job.
+
+    Args:
+        video_id: Video ID as string
+        sensitivity: Detection sensitivity ('low', 'medium', 'high', 'max')
+        custom_keywords: Optional custom keywords for detection
+        score_weights: Optional custom score weights
+
+    Returns:
+        Job result
+    """
+    pool = await get_redis_pool()
+    job = await pool.enqueue_job(
+        "detect_highlights",
+        video_id,
+        sensitivity=sensitivity,
+        custom_keywords=custom_keywords,
+        score_weights=score_weights,
+    )
     return job

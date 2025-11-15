@@ -84,7 +84,16 @@ async def health_check() -> dict[str, str]:
 
 
 # Register routers
-from app.api.routes import auth, clip, dashboard, silence, timeline, transcript, video
+from app.api.routes import (
+    auth,
+    clip,
+    dashboard,
+    highlight,
+    silence,
+    timeline,
+    transcript,
+    video,
+)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(transcript.router, prefix="/api", tags=["transcripts"])
@@ -95,3 +104,5 @@ app.include_router(silence.router, prefix="/api", tags=["silence"])
 app.include_router(clip.router, prefix="/api", tags=["clips"])
 app.include_router(clip.clip_router, prefix="/api", tags=["clips"])
 app.include_router(timeline.router, prefix="/api", tags=["timeline"])
+app.include_router(highlight.router, prefix="/api", tags=["highlights"])
+app.include_router(highlight.highlight_router, prefix="/api", tags=["highlights"])
