@@ -9,6 +9,7 @@ from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
     from app.models.highlight import Highlight
+    from app.models.subtitle import SubtitleStyle, SubtitleTranslation
     from app.models.transcript import Transcript
 
 
@@ -53,3 +54,5 @@ class Video(SQLModel, table=True):
         back_populates="video",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"},
     )
+    subtitle_styles: list["SubtitleStyle"] = Relationship(back_populates="video")
+    subtitle_translations: list["SubtitleTranslation"] = Relationship(back_populates="video")
