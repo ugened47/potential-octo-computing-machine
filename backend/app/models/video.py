@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 from sqlmodel import Field, Relationship, SQLModel
 
 if TYPE_CHECKING:
+    from app.models.highlight import Highlight
     from app.models.transcript import Transcript
 
 
@@ -48,3 +49,7 @@ class Video(SQLModel, table=True):
 
     # Relationships
     transcript: Optional["Transcript"] = Relationship(back_populates="video")
+    highlights: list["Highlight"] = Relationship(
+        back_populates="video",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )

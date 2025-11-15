@@ -8,6 +8,7 @@ from .batch import (
     ProcessingStage,
 )
 from .clip import Clip, ClipStatus
+from .highlight import Highlight, HighlightStatus, HighlightType
 from .transcript import Transcript, TranscriptStatus
 from .user import User
 from .video import Video, VideoStatus
@@ -25,4 +26,7 @@ __all__ = [
     "BatchVideo",
     "BatchVideoStatus",
     "ProcessingStage",
+    "Highlight",
+    "HighlightStatus",
+    "HighlightType",
 ]
