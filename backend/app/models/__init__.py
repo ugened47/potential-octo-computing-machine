@@ -1,5 +1,12 @@
 """Database models."""
 
+from .batch import (
+    BatchJob,
+    BatchJobStatus,
+    BatchVideo,
+    BatchVideoStatus,
+    ProcessingStage,
+)
 from .clip import Clip, ClipStatus
 from .highlight import Highlight, HighlightStatus, HighlightType
 from .transcript import Transcript, TranscriptStatus
@@ -14,6 +21,11 @@ __all__ = [
     "TranscriptStatus",
     "Clip",
     "ClipStatus",
+    "BatchJob",
+    "BatchJobStatus",
+    "BatchVideo",
+    "BatchVideoStatus",
+    "ProcessingStage",
     "Highlight",
     "HighlightStatus",
     "HighlightType",

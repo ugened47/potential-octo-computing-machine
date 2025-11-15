@@ -11,9 +11,12 @@ from sqlmodel import select
 
 from app.core.config import settings
 from app.core.db import async_session_maker
+from app.models.batch import BatchJob, BatchJobStatus
 from app.models.clip import Clip, ClipStatus
 from app.models.transcript import Transcript, TranscriptStatus
 from app.models.video import Video, VideoStatus
+from app.services.batch_export import BatchExportService
+from app.services.batch_processing import BatchProcessingService
 from app.services.clip_generation import ClipGenerationService
 from app.services.highlight_detection import HighlightDetectionService
 from app.services.s3 import S3Service
@@ -371,6 +374,99 @@ async def generate_clip(ctx: dict[str, Any], clip_id: str) -> dict[str, Any]:
         raise
 
 
+async def process_batch_job(
+    ctx: dict[str, Any],
+    batch_job_id: str,
+    concurrency: int = 1,
+) -> dict[str, Any]:
+    """
+    Process all videos in a batch job.
+
+    Args:
+        ctx: ARQ context
+        batch_job_id: Batch job ID as string
+        concurrency: Number of videos to process concurrently
+
+    Returns:
+        dict: Result with batch processing status
+    """
+    batch_job_uuid = UUID(batch_job_id)
+
+    try:
+        # Create database session for worker
+        async with async_session_maker() as db:
+            service = BatchProcessingService(db)
+
+            # Process batch
+            result = await service.process_batch(
+                batch_job_id=batch_job_uuid,
+                concurrency=concurrency,
+            )
+
+            return {
+                "status": "success",
+                "batch_job_id": batch_job_id,
+                "result": result,
+            }
+
+    except Exception as e:
+        # Update batch status to failed
+        async with async_session_maker() as db:
+            result = await db.execute(select(BatchJob).where(BatchJob.id == batch_job_uuid))
+            batch_job = result.scalar_one_or_none()
+
+            if batch_job:
+                batch_job.status = BatchJobStatus.FAILED
+                await db.commit()
+
+        raise
+
+
+async def export_batch_job(
+    ctx: dict[str, Any],
+    batch_job_id: str,
+    export_format: str,
+    include_failed: bool = False,
+    custom_naming: str | None = None,
+) -> dict[str, Any]:
+    """
+    Generate export for batch job.
+
+    Args:
+        ctx: ARQ context
+        batch_job_id: Batch job ID as string
+        export_format: Export format ('zip', 'merged', 'playlist')
+        include_failed: Include failed videos in export
+        custom_naming: Custom naming pattern for files
+
+    Returns:
+        dict: Result with export details
+    """
+    batch_job_uuid = UUID(batch_job_id)
+
+    try:
+        # Create database session for worker
+        async with async_session_maker() as db:
+            service = BatchExportService(db)
+
+            # Generate export
+            result = await service.export_batch(
+                batch_job_id=batch_job_uuid,
+                export_format=export_format,
+                include_failed=include_failed,
+                custom_naming=custom_naming,
+            )
+
+            return {
+                "status": "success",
+                "batch_job_id": batch_job_id,
+                "export": result,
+            }
+
+    except Exception as e:
+        raise
+
+
 async def detect_highlights(
     ctx: dict[str, Any],
     video_id: str,
@@ -535,6 +631,8 @@ class WorkerSettings:
         extract_video_metadata,
         remove_silence,
         generate_clip,
+        process_batch_job,
+        export_batch_job,
         detect_highlights,
     ]
 
@@ -625,6 +723,58 @@ async def enqueue_generate_clip(clip_id: str) -> Any:
     """
     pool = await get_redis_pool()
     job = await pool.enqueue_job("generate_clip", clip_id)
+    return job
+
+
+async def enqueue_process_batch_job(
+    batch_job_id: str,
+    concurrency: int = 1,
+) -> Any:
+    """
+    Enqueue a batch processing job.
+
+    Args:
+        batch_job_id: Batch job ID as string
+        concurrency: Number of videos to process concurrently
+
+    Returns:
+        Job result
+    """
+    pool = await get_redis_pool()
+    job = await pool.enqueue_job(
+        "process_batch_job",
+        batch_job_id,
+        concurrency=concurrency,
+    )
+    return job
+
+
+async def enqueue_export_batch_job(
+    batch_job_id: str,
+    export_format: str,
+    include_failed: bool = False,
+    custom_naming: str | None = None,
+) -> Any:
+    """
+    Enqueue a batch export job.
+
+    Args:
+        batch_job_id: Batch job ID as string
+        export_format: Export format ('zip', 'merged', 'playlist')
+        include_failed: Include failed videos in export
+        custom_naming: Custom naming pattern for files
+
+    Returns:
+        Job result
+    """
+    pool = await get_redis_pool()
+    job = await pool.enqueue_job(
+        "export_batch_job",
+        batch_job_id,
+        export_format=export_format,
+        include_failed=include_failed,
+        custom_naming=custom_naming,
+    )
     return job
 
 
